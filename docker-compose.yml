@@ -1,0 +1,32 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"   # Next.js
+      - "8000:8000"   # FastAPI
+    environment:
+      - APP_ENV=production
+    restart: unless-stopped
+
+  # ── Local dev: run each service separately ─────────────────────────────────
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    profiles: [dev]
+
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    profiles: [dev]
