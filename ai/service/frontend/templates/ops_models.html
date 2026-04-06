@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="card">
+  <h2>Model Registry</h2>
+  {% if flash %}
+    <p class="ops-flash">
+      {% if flash.level == 'ok' %}
+        <span class="badge ok">ok</span>
+      {% elif flash.level == 'err' %}
+        <span class="badge err">error</span>
+      {% else %}
+        <span class="badge warn">notice</span>
+      {% endif %}
+      {{ flash.message }}
+    </p>
+  {% endif %}
+  {% if models %}
+    <table>
+      <thead>
+        <tr>
+          <th>Model ID</th>
+          <th>Name</th>
+          <th>Engine</th>
+          <th>Version</th>
+          <th>Model Ref</th>
+          <th>Active</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in models %}
+        {% set runtime_up = engine_avail.get(m.engine, false) %}
+        <tr>
+          <td><a href="/ops/models/{{ m.model_id }}">{{ m.model_id }}</a></td>
+          <td>{{ m.name }}</td>
+          <td>{{ m.engine }}</td>
+          <td>{{ m.version }}</td>
+          <td>{{ model_refs.get(m.model_id, "llm:unknown") }}</td>
+          <td>
+            {% if m.active %}
+              <span class="dot-active"></span>Active
+            {% else %}
+              <span class="dot-inactive"></span>Inactive
+            {% endif %}
+          </td>
+          <td>
+            {% if m.status == 'online' %}
+              <span class="badge ok">online</span>
+            {% elif m.status == 'degraded' %}
+              <span class="badge err">degraded</span>
+            {% elif not runtime_up %}
+              <span class="badge err">runtime down</span>
+            {% elif m.status == 'inactive' %}
+              <span class="badge err">inactive</span>
+            {% else %}
+              <span class="badge warn">{{ m.status }}</span>
+            {% endif %}
+          </td>
+          <td class="actions-row">
+            <form method="post" action="/ops/models/activate" style="margin:0">
+              <input type="hidden" name="model_id" value="{{ m.model_id }}" />
+              <button
+                type="submit"
+                {% if m.active or not runtime_up %}disabled{% endif %}
+                title="{% if not runtime_up %}Engine runtime is down. Start runtime first.{% endif %}"
+              >
+                Activate
+              </button>
+            </form>
+            <form method="post" action="/ops/models/deactivate" style="margin:0">
+              <input type="hidden" name="model_id" value="{{ m.model_id }}" />
+              <button type="submit" {% if not m.active %}disabled{% endif %} class="btn-danger">Disable</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  {% else %}
+    <p class="empty">No models registered.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

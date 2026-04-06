@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="card">
+  <h2>Model Detail</h2>
+  <table class="kv-table">
+    <tbody>
+      <tr><th>Model ID</th><td>{{ model.model_id }}</td></tr>
+      <tr><th>Name</th><td>{{ model.name }}</td></tr>
+      <tr><th>Engine</th><td>{{ model.engine }}</td></tr>
+      <tr><th>Version</th><td>{{ model.version }}</td></tr>
+      <tr><th>Active</th><td>{{ model.active }}</td></tr>
+      <tr><th>Status</th><td>{{ model.status }}</td></tr>
+      <tr><th>Success</th><td>{{ metrics.success_count }}</td></tr>
+      <tr><th>Failure</th><td>{{ metrics.failure_count }}</td></tr>
+      <tr><th>Avg Latency (ms)</th><td>{{ "%.2f"|format(metrics.avg_latency_ms) }}</td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:12px;">
+    <a href="/ops/models">Back to Models</a>
+  </div>
+</section>
+
+{% endblock %}

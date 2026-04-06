@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="grid two">
+
+  <!-- Engine Health -->
+  <article class="card">
+    <h2>Engine Health</h2>
+    <div class="engine-list">
+      {% for eng in engines %}
+      <div class="engine-row">
+        <div>
+          <span class="engine-name">{{ eng.name }}</span>
+          <span class="engine-model">{{ eng.model }}</span>
+        </div>
+        {% if not eng.enabled %}
+          <span class="badge warn">DISABLED</span>
+        {% elif eng.available %}
+          <span class="badge ok">UP</span>
+        {% else %}
+          <span class="badge err">DOWN</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <!-- Metrics -->
+  <article class="card">
+    <h2>Metrics</h2>
+    {% if metrics %}
+      <div class="metric-grid">
+        {% for k, v in metrics.items() %}
+          <div class="metric-item">
+            <div class="metric-label">{{ k }}</div>
+            <div class="metric-value">{{ v }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">No metrics recorded yet.</p>
+    {% endif %}
+  </article>
+
+</section>
+
+<!-- Active Models -->
+<section class="card">
+  <h2>Active Models</h2>
+  {% if models %}
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Engine</th>
+          <th>Version</th>
+          <th>Active</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in models %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td>{{ m.engine }}</td>
+          <td>{{ m.version }}</td>
+          <td>
+            {% if m.active %}
+              <span class="dot-active"></span>Yes
+            {% else %}
+              <span class="dot-inactive"></span>No
+            {% endif %}
+          </td>
+          <td>
+            {% if m.status == 'online' %}
+              <span class="badge ok">online</span>
+            {% elif m.status == 'degraded' %}
+              <span class="badge err">degraded</span>
+            {% elif m.status == 'inactive' %}
+              <span class="badge err">inactive</span>
+            {% else %}
+              <span class="badge warn">{{ m.status }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No active models found.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="card settings-card">
+  <h2>Runtime Settings (Effective)</h2>
+  <table class="kv-table">
+    <tbody>
+      <tr><th>Environment</th><td>{{ settings.app_env }}</td></tr>
+      <tr><th>Default Engine</th><td>{{ settings.default_engine }}</td></tr>
+      <tr><th>LLM Backend URL</th><td>{{ settings.llm_base_url }}</td></tr>
+      <tr><th>Paddle Model</th><td>{{ settings.llm_model_paddle }}</td></tr>
+      <tr><th>GLM Model</th><td>{{ settings.llm_model_glm }}</td></tr>
+      <tr><th>Backend Timeout</th><td>{{ settings.llm_request_timeout_s }} sec</td></tr>
+      <tr><th>Backend Keep Alive</th><td>{{ settings.llm_keep_alive }}</td></tr>
+      <tr><th>Backend Temperature</th><td>{{ settings.llm_temperature }}</td></tr>
+      <tr><th>Backend Image Max Side</th><td>{{ settings.llm_image_max_side_px }} px</td></tr>
+      <tr><th>Backend Max Tokens</th><td>{{ settings.llm_max_tokens }}</td></tr>
+      <tr><th>Hint OCR Enabled</th><td>{{ settings.local_model_hint_ocr_enable }}</td></tr>
+      <tr><th>Hint OCR Languages</th><td>{{ settings.local_model_hint_ocr_langs }}</td></tr>
+      <tr><th>Hint OCR Timeout</th><td>{{ settings.local_model_hint_ocr_timeout_s }} sec</td></tr>
+      <tr><th>Hint OCR Max Chars</th><td>{{ settings.local_model_hint_ocr_max_chars }}</td></tr>
+      <tr><th>Playground Timeout</th><td>{{ settings.playground_timeout_s }} sec</td></tr>
+      <tr><th>OCR Concurrency</th><td>{{ settings.ocr_concurrency }}</td></tr>
+      <tr><th>Max Upload</th><td>{{ settings.max_upload_mb }} MB</td></tr>
+      <tr><th>Prefer Embedded PDF Text</th><td>{{ settings.prefer_embedded_pdf_text }}</td></tr>
+      <tr><th>Image Target DPI</th><td>{{ settings.image_target_dpi }}</td></tr>
+      <tr><th>Image Assumed Input DPI</th><td>{{ settings.image_assumed_input_dpi }}</td></tr>
+      <tr><th>Image Apply Otsu</th><td>{{ settings.image_apply_otsu }}</td></tr>
+      <tr><th>Image Max Side</th><td>{{ settings.image_max_side_px }} px</td></tr>
+      <tr><th>OCR Fallback Threshold</th><td>{{ settings.ocr_fallback_confidence_threshold }}</td></tr>
+      <tr><th>Database URL</th><td>{{ settings.database_url }}</td></tr>
+      <tr><th>Redis URL</th><td>{{ settings.redis_url }}</td></tr>
+      <tr><th>Job Timeout</th><td>{{ settings.job_timeout_s }} sec</td></tr>
+      <tr><th>Job Max Retries</th><td>{{ settings.job_max_retries }}</td></tr>
+      <tr><th>Job Retry Backoff</th><td>{{ settings.job_retry_backoff_s }} sec</td></tr>
+      <tr><th>Job Queue Backend</th><td>{{ settings.job_queue_backend }}</td></tr>
+      <tr><th>Idempotency TTL</th><td>{{ settings.idempotency_ttl_s }} sec</td></tr>
+      <tr><th>Model Probe Interval</th><td>{{ settings.model_probe_interval_s }} sec</td></tr>
+      <tr><th>Model Availability TTL</th><td>{{ settings.model_availability_ttl_s }} sec</td></tr>
+      <tr><th>Malware Scan Enabled</th><td>{{ settings.malware_scan_enable }}</td></tr>
+      <tr><th>Malware Scan Command</th><td>{{ settings.malware_scan_command or "-" }}</td></tr>
+      <tr>
+        <th>Paddle Profile</th>
+        <td>
+          {% if settings.paddle_enable %}
+            <span class="badge ok">Enabled</span>
+          {% else %}
+            <span class="badge err">Disabled</span>
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <th>GLM Profile</th>
+        <td>
+          {% if settings.glm_enable %}
+            <span class="badge ok">Enabled</span>
+          {% else %}
+            <span class="badge err">Disabled</span>
+          {% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="card settings-card">
+  <h2>Setting Sources (env/default)</h2>
+  <table class="kv-table">
+    <thead>
+      <tr>
+        <th>Env Key</th>
+        <th>Effective Value</th>
+        <th>Source</th>
+        <th>Raw</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in settings_source %}
+      <tr>
+        <td>{{ item.env_key }}</td>
+        <td>{{ item.value }}</td>
+        <td>{{ item.source }}</td>
+        <td>{{ item.raw }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card settings-card">
+  <h2>Model Runtime Diagnostics</h2>
+  <table class="kv-table">
+    <thead>
+      <tr>
+        <th>Engine</th>
+        <th>Configured Model</th>
+        <th>Runtime Model</th>
+        <th>LLM Backend URL</th>
+        <th>Engine Available</th>
+        <th>Last Error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in model_checks %}
+      <tr>
+        <td>{{ row.engine }}</td>
+        <td>{{ row.configured_model }}</td>
+        <td>{{ row.runtime_model }}</td>
+        <td>{{ row.base_url }}</td>
+        <td>
+          {% if row.available %}
+            <span class="badge ok">true</span>
+          {% else %}
+            <span class="badge err">false</span>
+          {% endif %}
+        </td>
+        <td>{{ row.last_error or '-' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card settings-card">
+  <h2>DB Persisted Models</h2>
+  <table class="kv-table">
+    <thead>
+      <tr>
+        <th>Model ID</th>
+        <th>Name</th>
+        <th>Engine</th>
+        <th>Version</th>
+        <th>Active</th>
+        <th>Status</th>
+        <th>Updated At</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if db_models %}
+        {% for m in db_models %}
+        <tr>
+          <td>{{ m.model_id }}</td>
+          <td>{{ m.name }}</td>
+          <td>{{ m.engine }}</td>
+          <td>{{ m.version }}</td>
+          <td>
+            {% if m.active %}
+              <span class="badge ok">true</span>
+            {% else %}
+              <span class="badge err">false</span>
+            {% endif %}
+          </td>
+          <td>{{ m.status }}</td>
+          <td>{{ m.updated_at or '-' }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="7">No persisted model rows found.</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</section>
+
+{% endblock %}
