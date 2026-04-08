@@ -37,13 +37,15 @@ services:
       - shared_snapocket
     profiles: [dev]
 
+
+
   # ── AI dev: opt-in only (never auto-start with default/dev profiles) ──────
   llama-server:
     image: ghcr.io/ggml-org/llama.cpp:server
     restart: unless-stopped
     cpus: "${AI_LLAMA_CPUS:-6.0}"
     ports:
-      - "${AI_LLAMA_LOCAL_PORT:-18115}:8080"
+      - "${AI_LLAMA_LOCAL_BIND_IP:-127.0.0.1}:${AI_LLAMA_LOCAL_PORT:-18115}:8080"
     command:
       - -m
       - /models/${AI_LLAMA_MODEL_FILE:-PaddleOCR-VL-1.5-BF16.gguf}
@@ -80,6 +82,18 @@ services:
       dockerfile: backend/Dockerfile.dev
     environment:
       APP_ENV: ${AI_APP_ENV:-container}
+      AIOPS_API_KEY: ${AIOPS_API_KEY:-}
+      OPS_BASIC_USER: ${OPS_BASIC_USER:-}
+      OPS_BASIC_PASS: ${OPS_BASIC_PASS:-}
+      AIOPS_REQUIRE_API_KEY: ${AIOPS_REQUIRE_API_KEY:-1}
+      AIOPS_REQUIRE_OPS_BASIC_AUTH: ${AIOPS_REQUIRE_OPS_BASIC_AUTH:-1}
+      AIOPS_ALLOWED_CLIENTS: ${AIOPS_ALLOWED_CLIENTS:-127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      AIOPS_TRUST_X_FORWARDED_FOR: ${AIOPS_TRUST_X_FORWARDED_FOR:-0}
+      AIOPS_SERVER_SECRET_KEY: ${AIOPS_SERVER_SECRET_KEY:-}
+      DISPATCH_UPSTREAM_TIMEOUT_S: ${DISPATCH_UPSTREAM_TIMEOUT_S:-180}
+      ALLOW_PUBLIC_SERVER_ENDPOINTS: ${ALLOW_PUBLIC_SERVER_ENDPOINTS:-0}
+      ALLOW_HOSTNAME_SERVER_ENDPOINTS: ${ALLOW_HOSTNAME_SERVER_ENDPOINTS:-0}
+      ALLOW_ZROK_SERVER_ENDPOINTS: ${ALLOW_ZROK_SERVER_ENDPOINTS:-1}
       LLM_BASE_URL: ${AI_LLAMACPP_BASE_URL:-http://llama-server:8080}
       LLM_MODEL_PADDLE: ${AI_LLAMACPP_MODEL_PADDLE:-PaddleOCR-VL-1.5-BF16.gguf}
       LLM_MODEL_GLM: ${AI_LLAMACPP_MODEL_GLM:-PaddleOCR-VL-1.5-BF16.gguf}
@@ -88,7 +102,7 @@ services:
       LLM_MAX_TOKENS: ${AI_LLAMACPP_MAX_TOKENS:-96}
       PLAYGROUND_TIMEOUT_S: ${AI_PLAYGROUND_TIMEOUT_S:-120}
     ports:
-      - "${AI_AIOPS_LOCAL_PORT:-18081}:8080"
+      - "${AI_AIOPS_LOCAL_BIND_IP:-127.0.0.1}:${AI_AIOPS_LOCAL_PORT:-18081}:8080"
     depends_on:
       - llama-server
     volumes:

@@ -31,6 +31,17 @@ class Settings:
     api_key: str = os.getenv("AIOPS_API_KEY", "")
     ops_basic_user: str = os.getenv("OPS_BASIC_USER", "")
     ops_basic_pass: str = os.getenv("OPS_BASIC_PASS", "")
+    aiops_server_secret_key: str = os.getenv("AIOPS_SERVER_SECRET_KEY", "")
+    require_api_key: bool = _as_bool(os.getenv("AIOPS_REQUIRE_API_KEY"), True)
+    require_ops_basic_auth: bool = _as_bool(os.getenv("AIOPS_REQUIRE_OPS_BASIC_AUTH"), True)
+    allowed_clients_raw: str = os.getenv(
+        "AIOPS_ALLOWED_CLIENTS",
+        "127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+    )
+    trust_x_forwarded_for: bool = _as_bool(os.getenv("AIOPS_TRUST_X_FORWARDED_FOR"), False)
+    allow_public_server_endpoints: bool = _as_bool(os.getenv("ALLOW_PUBLIC_SERVER_ENDPOINTS"), False)
+    allow_hostname_server_endpoints: bool = _as_bool(os.getenv("ALLOW_HOSTNAME_SERVER_ENDPOINTS"), False)
+    allow_zrok_server_endpoints: bool = _as_bool(os.getenv("ALLOW_ZROK_SERVER_ENDPOINTS"), True)
 
     default_engine: str = os.getenv("DEFAULT_ENGINE", "auto")
     paddle_enable: bool = _as_bool(os.getenv("PADDLE_ENABLE"), True)
@@ -52,6 +63,7 @@ class Settings:
         os.getenv("LLM_IMAGE_MAX_SIDE_PX", os.getenv("OLLAMA_IMAGE_MAX_SIDE_PX", "1536"))
     )
     llm_max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", os.getenv("OLLAMA_MAX_TOKENS", "96")))
+    dispatch_upstream_timeout_s: float = float(os.getenv("DISPATCH_UPSTREAM_TIMEOUT_S", "180"))
 
     # VLM OCR result verification with Tesseract
     local_model_hint_ocr_enable: bool = _as_bool(os.getenv("LOCAL_MODEL_HINT_OCR_ENABLE"), True)
@@ -129,6 +141,17 @@ def load_settings() -> Settings:
         api_key=os.getenv("AIOPS_API_KEY", ""),
         ops_basic_user=os.getenv("OPS_BASIC_USER", ""),
         ops_basic_pass=os.getenv("OPS_BASIC_PASS", ""),
+        aiops_server_secret_key=os.getenv("AIOPS_SERVER_SECRET_KEY", ""),
+        require_api_key=_as_bool(os.getenv("AIOPS_REQUIRE_API_KEY"), True),
+        require_ops_basic_auth=_as_bool(os.getenv("AIOPS_REQUIRE_OPS_BASIC_AUTH"), True),
+        allowed_clients_raw=os.getenv(
+            "AIOPS_ALLOWED_CLIENTS",
+            "127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+        ),
+        trust_x_forwarded_for=_as_bool(os.getenv("AIOPS_TRUST_X_FORWARDED_FOR"), False),
+        allow_public_server_endpoints=_as_bool(os.getenv("ALLOW_PUBLIC_SERVER_ENDPOINTS"), False),
+        allow_hostname_server_endpoints=_as_bool(os.getenv("ALLOW_HOSTNAME_SERVER_ENDPOINTS"), False),
+        allow_zrok_server_endpoints=_as_bool(os.getenv("ALLOW_ZROK_SERVER_ENDPOINTS"), True),
         default_engine=os.getenv("DEFAULT_ENGINE", "auto"),
         paddle_enable=_as_bool(os.getenv("PADDLE_ENABLE"), True),
         glm_enable=_as_bool(os.getenv("GLM_ENABLE"), True),
@@ -148,6 +171,7 @@ def load_settings() -> Settings:
             os.getenv("LLM_IMAGE_MAX_SIDE_PX", os.getenv("OLLAMA_IMAGE_MAX_SIDE_PX", "1536"))
         ),
         llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", os.getenv("OLLAMA_MAX_TOKENS", "96"))),
+        dispatch_upstream_timeout_s=float(os.getenv("DISPATCH_UPSTREAM_TIMEOUT_S", "180")),
         local_model_hint_ocr_enable=_as_bool(os.getenv("LOCAL_MODEL_HINT_OCR_ENABLE"), True),
         local_model_hint_ocr_langs=os.getenv("LOCAL_MODEL_HINT_OCR_LANGS", "kor+eng"),
         local_model_hint_ocr_timeout_s=float(

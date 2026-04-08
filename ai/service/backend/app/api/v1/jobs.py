@@ -10,6 +10,8 @@ from app.api.idempotency import job_request_hash
 from app.api.uploads import validate_upload
 from app.api.utils import ok_response
 from app.schemas.job import JobStatus
+from app.schemas.server import ServerKind
+from app.services.dispatch_service import DispatchRequestError
 from app.services.idempotency import IdempotencyConflictError
 from app.services.model_runtime import is_engine_active, resolve_effective_engine
 from app.services.state import AppState
@@ -83,19 +85,26 @@ async def create_job(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     state: AppState = Depends(get_state),
 ):
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
+
     payload = await file.read()
     validate_upload(state, file, payload)
-    try:
-        resolved_engine = _resolve_engine_hint(state, engine_hint)
-    except RuntimeError as exc:
-        raise api_error(status.HTTP_409_CONFLICT, "MODEL_NOT_READY", str(exc)) from exc
+    active_server = state.dispatch.active_server()
+    if active_server.kind == ServerKind.local:
+        try:
+            resolved_engine = _resolve_engine_hint(state, engine_hint)
+        except RuntimeError as exc:
+            raise api_error(status.HTTP_409_CONFLICT, "MODEL_NOT_READY", str(exc)) from exc
+    else:
+        resolved_engine = _normalize_engine_hint(engine_hint) or "auto"
     filename = file.filename or "upload.bin"
 
     req_hash = job_request_hash(
         payload=payload,
         filename=filename,
         doc_id=doc_id,
-        engine_hint=resolved_engine,
+        engine_hint=f"{active_server.server_id}|{resolved_engine}",
     )
     if idempotency_key:
         # Same idempotency key + same payload => return existing job_id.
@@ -115,21 +124,17 @@ async def create_job(
             state.metrics.inc("jobs_idempotent_hit_total")
             return ok_response(request, cached)
 
-    job_id = state.job_manager.submit(
-        state.pipeline.process,
-        filename=filename,
-        file_bytes=payload,
-        content_type=file.content_type,
-        engine_hint=resolved_engine,
-        doc_id=doc_id,
-        job_meta={
-            # Metadata only; raw file bytes are not stored here.
-            "filename": filename,
-            "content_type": file.content_type,
-            "engine_hint": resolved_engine,
-            "doc_id": doc_id,
-        },
-    )
+    try:
+        job_id = state.dispatch.create_job(
+            filename=filename,
+            file_bytes=payload,
+            content_type=file.content_type,
+            engine_hint=resolved_engine,
+            doc_id=doc_id,
+        )
+    except DispatchRequestError as exc:
+        raise api_error(exc.status_code, exc.code, exc.message) from exc
+
     response_data = {"job_id": job_id}
     if idempotency_key:
         state.idempotency.put(
@@ -149,45 +154,60 @@ async def create_job(
 
 @router.get("/jobs", dependencies=[Depends(require_api_key)])
 def list_jobs(request: Request, state: AppState = Depends(get_state)):
-    jobs = [job.model_dump() for job in state.job_manager.list_jobs()]
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
+    try:
+        jobs = state.dispatch.list_jobs()
+    except DispatchRequestError as exc:
+        raise api_error(exc.status_code, exc.code, exc.message) from exc
     return ok_response(request, jobs)
 
 
 @router.get("/jobs/{job_id}", dependencies=[Depends(require_api_key)])
 def get_job(job_id: str, request: Request, state: AppState = Depends(get_state)):
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
     try:
-        info = state.job_manager.get_info(job_id)
+        info = state.dispatch.get_job(job_id=job_id)
     except KeyError as exc:
         raise api_error(status.HTTP_404_NOT_FOUND, "JOB_NOT_FOUND", "Job not found") from exc
-    return ok_response(request, info.model_dump())
+    except DispatchRequestError as exc:
+        raise api_error(exc.status_code, exc.code, exc.message) from exc
+    return ok_response(request, info)
 
 
 @router.get("/jobs/{job_id}/result", dependencies=[Depends(require_api_key)])
 def get_job_result(job_id: str, request: Request, state: AppState = Depends(get_state)):
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
     try:
-        info = state.job_manager.get_info(job_id)
-        result = state.job_manager.get_result(job_id)
+        payload = state.dispatch.get_job_result(job_id=job_id)
     except KeyError as exc:
         raise api_error(status.HTTP_404_NOT_FOUND, "JOB_NOT_FOUND", "Job not found") from exc
-
-    if info.status not in {JobStatus.succeeded, JobStatus.failed, JobStatus.cancelled}:
-        return ok_response(request, {"status": info.status, "result": None})
-
-    data = result.model_dump() if hasattr(result, "model_dump") else result
-    return ok_response(request, {"status": info.status, "result": data, "error": info.error})
+    except DispatchRequestError as exc:
+        raise api_error(exc.status_code, exc.code, exc.message) from exc
+    return ok_response(request, payload)
 
 
 @router.post("/jobs/{job_id}/cancel", dependencies=[Depends(require_api_key)])
 def cancel_job(job_id: str, request: Request, state: AppState = Depends(get_state)):
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
     try:
-        cancelled = state.job_manager.cancel(job_id)
+        cancelled = state.dispatch.cancel_job(job_id=job_id)
     except KeyError as exc:
         raise api_error(status.HTTP_404_NOT_FOUND, "JOB_NOT_FOUND", "Job not found") from exc
+    except DispatchRequestError as exc:
+        raise api_error(exc.status_code, exc.code, exc.message) from exc
 
     if not cancelled:
-        info = state.job_manager.get_info(job_id)
-        if info.status in {JobStatus.running, JobStatus.succeeded, JobStatus.failed}:
-            raise api_error(status.HTTP_409_CONFLICT, "JOB_NOT_CANCELLABLE", f"Job status is {info.status}")
+        try:
+            info = state.dispatch.get_job(job_id=job_id)
+            status_value = info.get("status")
+        except Exception:
+            status_value = "unknown"
+        if status_value in {JobStatus.running.value, JobStatus.succeeded.value, JobStatus.failed.value}:
+            raise api_error(status.HTTP_409_CONFLICT, "JOB_NOT_CANCELLABLE", f"Job status is {status_value}")
 
     state.persistence.insert_audit(
         action="job.cancel",
@@ -200,17 +220,22 @@ def cancel_job(job_id: str, request: Request, state: AppState = Depends(get_stat
 
 @router.post("/jobs/{job_id}/retry", dependencies=[Depends(require_api_key)])
 def retry_job(job_id: str, request: Request, state: AppState = Depends(get_state)):
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
     try:
-        info = state.job_manager.get_info(job_id)
-        if info.status not in {JobStatus.failed, JobStatus.cancelled}:
+        info = state.dispatch.get_job(job_id=job_id)
+        status_value = str(info.get("status") or "")
+        if status_value not in {JobStatus.failed.value, JobStatus.cancelled.value}:
             raise api_error(
                 status.HTTP_409_CONFLICT,
                 "JOB_NOT_RETRIABLE",
-                f"Job status is {info.status}",
+                f"Job status is {status_value}",
             )
-        new_job_id = state.job_manager.retry(job_id)
+        new_job_id = state.dispatch.retry_job(job_id=job_id)
     except KeyError as exc:
         raise api_error(status.HTTP_404_NOT_FOUND, "JOB_NOT_FOUND", "Job not found") from exc
+    except DispatchRequestError as exc:
+        raise api_error(exc.status_code, exc.code, exc.message) from exc
     state.persistence.insert_audit(
         action="job.retry",
         target_type="job",

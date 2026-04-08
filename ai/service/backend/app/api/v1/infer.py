@@ -11,9 +11,11 @@ from app.api.errors import api_error
 from app.api.idempotency import infer_request_hash
 from app.api.uploads import validate_upload
 from app.api.utils import ok_response
+from app.services.dispatch_service import DispatchRequestError
 from app.services.idempotency import IdempotencyConflictError
 from app.services.ocr.base import OCREngineBusyError
 from app.services.model_runtime import is_engine_active, resolve_effective_engine
+from app.schemas.server import ServerKind
 from app.services.state import AppState
 
 router = APIRouter(prefix="/v1", tags=["inference"])
@@ -145,19 +147,27 @@ async def infer(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     state: AppState = Depends(get_state),
 ):
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
+
     payload = await file.read()
     validate_upload(state, file, payload)
 
-    try:
-        resolved_engine = _resolve_engine_hint(state, engine_hint)
-    except RuntimeError as exc:
-        raise api_error(status.HTTP_409_CONFLICT, "MODEL_NOT_READY", str(exc)) from exc
+    active_server = state.dispatch.active_server()
+    if active_server.kind == ServerKind.local:
+        try:
+            resolved_engine = _resolve_engine_hint(state, engine_hint)
+        except RuntimeError as exc:
+            raise api_error(status.HTTP_409_CONFLICT, "MODEL_NOT_READY", str(exc)) from exc
+    else:
+        resolved_engine = _normalize_engine_hint(engine_hint) or "auto"
+
     filename = file.filename or "upload.bin"
     req_hash = infer_request_hash(
         payload=payload,
         filename=filename,
         doc_id=doc_id,
-        engine_hint=resolved_engine,
+        engine_hint=f"{active_server.server_id}|{resolved_engine}",
     )
 
     if idempotency_key:
@@ -178,31 +188,40 @@ async def infer(
             state.metrics.inc("infer_idempotent_hit_total")
             return ok_response(request, cached)
 
-    if not _try_acquire_engine_gate(state, resolved_engine):
-        raise api_error(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            "ENGINE_BUSY",
-            f"{resolved_engine} inference already running",
-        )
+    gate_acquired = True
+    if active_server.kind == ServerKind.local:
+        gate_acquired = _try_acquire_engine_gate(state, resolved_engine)
+        if not gate_acquired:
+            raise api_error(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "ENGINE_BUSY",
+                f"{resolved_engine} inference already running",
+            )
     try:
-        result = await state.pipeline.process_async(
+        response_data = await state.dispatch.infer(
             filename=filename,
             file_bytes=payload,
-            content_type=file.content_type,
+            content_type=file.content_type or "application/octet-stream",
             engine_hint=resolved_engine,
             doc_id=doc_id,
         )
+    except DispatchRequestError as exc:
+        state.metrics.inc("infer_failure_total")
+        raise api_error(exc.status_code, exc.code, exc.message) from exc
     except OCREngineBusyError as exc:
         raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "ENGINE_BUSY", str(exc)) from exc
     except Exception as exc:
         state.metrics.inc("infer_failure_total")
         raise api_error(status.HTTP_400_BAD_REQUEST, "INFER_FAILED", str(exc)) from exc
     finally:
-        _release_engine_gate(state, resolved_engine)
+        if active_server.kind == ServerKind.local and gate_acquired:
+            _release_engine_gate(state, resolved_engine)
 
     state.metrics.inc("infer_success_total")
-    _record_model_metric(state, result.engine_used, success=True, latency_ms=result.latency_ms)
-    response_data = result.model_dump()
+    engine_used = str(response_data.get("engine_used") or "")
+    latency_ms = int(response_data.get("latency_ms", 0) or 0)
+    if active_server.kind == ServerKind.local and engine_used:
+        _record_model_metric(state, engine_used, success=True, latency_ms=latency_ms)
     if idempotency_key:
         state.idempotency.put(
             route="/v1/infer",
@@ -262,15 +281,23 @@ async def infer_batch(
     engine_hint: str | None = Form(default="auto"),
     state: AppState = Depends(get_state),
 ):
+    if state.dispatch is None:
+        raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "DISPATCH_UNAVAILABLE", "dispatch service is unavailable")
+
     if not files:
         raise api_error(status.HTTP_400_BAD_REQUEST, "INVALID_PAYLOAD", "No files provided")
     if len(files) > 20:
         raise api_error(status.HTTP_400_BAD_REQUEST, "INVALID_PAYLOAD", "Max 20 files per batch")
 
-    try:
-        resolved_engine = _resolve_engine_hint(state, engine_hint)
-    except RuntimeError as exc:
-        raise api_error(status.HTTP_409_CONFLICT, "MODEL_NOT_READY", str(exc)) from exc
+    active_server = state.dispatch.active_server()
+    if active_server.kind == ServerKind.local:
+        try:
+            resolved_engine = _resolve_engine_hint(state, engine_hint)
+        except RuntimeError as exc:
+            raise api_error(status.HTTP_409_CONFLICT, "MODEL_NOT_READY", str(exc)) from exc
+    else:
+        resolved_engine = _normalize_engine_hint(engine_hint) or "auto"
+
     results: list[dict] = []
     errors: list[dict] = []
     prepared: list[tuple[int, str, str | None, bytes]] = []
@@ -303,6 +330,14 @@ async def infer_batch(
             )
             continue
         prepared.append((idx, file.filename or f"upload-{idx}.bin", file.content_type, payload))
+
+    if active_server.kind != ServerKind.local:
+        remote_files = [(filename, content_type, payload) for _idx, filename, content_type, payload in prepared]
+        try:
+            data = await state.dispatch.infer_batch(files=remote_files, engine_hint=resolved_engine)
+        except DispatchRequestError as exc:
+            raise api_error(exc.status_code, exc.code, exc.message) from exc
+        return ok_response(request, data)
 
     concurrency = max(1, int(getattr(state.settings, "ocr_concurrency", 1)))
     sem = asyncio.Semaphore(concurrency)

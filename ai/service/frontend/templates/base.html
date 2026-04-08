@@ -56,6 +56,31 @@
         <span class="timestamp" id="clock"></span>
       </div>
     </header>
+    {% if ops_dispatch_enabled %}
+    <section class="dispatch-strip">
+      <span class="dispatch-chip">
+        <strong>Active:</strong> {{ ops_active_backend_label }}
+      </span>
+      <span class="dispatch-chip">
+        <strong>Server ID:</strong> {{ ops_active_server_id }}
+      </span>
+      <span class="dispatch-chip">
+        <strong>Kind:</strong> {{ ops_active_server_kind }}
+      </span>
+      <span class="dispatch-chip">
+        <strong>Queue:</strong>
+        {{ ops_queue_summary.queued }}q /
+        {{ ops_queue_summary.running }}r /
+        {{ ops_queue_summary.succeeded }}ok /
+        {{ ops_queue_summary.failed }}err
+      </span>
+      <span class="dispatch-chip">
+        <strong>Runtime:</strong>
+        paddle={{ 'up' if ops_runtime.paddle else 'down' }},
+        glm={{ 'up' if ops_runtime.glm else 'down' }}
+      </span>
+    </section>
+    {% endif %}
     <main class="content">
       {% block content %}{% endblock %}
     </main>

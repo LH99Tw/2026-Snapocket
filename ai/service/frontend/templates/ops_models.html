@@ -1,20 +1,63 @@
 {% extends "base.html" %}
 {% block content %}
 
+<style>
+.ops-tabs { display:flex; gap:8px; margin-bottom:12px; }
+.ops-tab {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:8px 14px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text-dim);
+  text-decoration:none;
+  font-weight:600;
+}
+.ops-tab.active {
+  border-color:var(--primary);
+  color:var(--primary);
+  background:var(--primary-dim);
+}
+.server-form-grid {
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap:8px;
+  margin-bottom:12px;
+}
+.server-form-grid input { width:100%; }
+@media (max-width: 980px) {
+  .server-form-grid { grid-template-columns: 1fr; }
+}
+.queue-kpis {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+</style>
+
+<div class="ops-tabs">
+  <a class="ops-tab {% if active_tab == 'models' %}active{% endif %}" href="/ops/models?tab=models">Models</a>
+  <a class="ops-tab {% if active_tab == 'servers' %}active{% endif %}" href="/ops/models?tab=servers">Servers</a>
+</div>
+
+{% if flash %}
+  <p class="ops-flash">
+    {% if flash.level == 'ok' %}
+      <span class="badge ok">ok</span>
+    {% elif flash.level == 'err' %}
+      <span class="badge err">error</span>
+    {% else %}
+      <span class="badge warn">notice</span>
+    {% endif %}
+    {{ flash.message }}
+  </p>
+{% endif %}
+
+{% if active_tab == 'models' %}
 <section class="card">
   <h2>Model Registry</h2>
-  {% if flash %}
-    <p class="ops-flash">
-      {% if flash.level == 'ok' %}
-        <span class="badge ok">ok</span>
-      {% elif flash.level == 'err' %}
-        <span class="badge err">error</span>
-      {% else %}
-        <span class="badge warn">notice</span>
-      {% endif %}
-      {{ flash.message }}
-    </p>
-  {% endif %}
   {% if models %}
     <table>
       <thead>
@@ -78,10 +121,115 @@
         {% endfor %}
       </tbody>
     </table>
-
   {% else %}
     <p class="empty">No models registered.</p>
   {% endif %}
 </section>
+{% endif %}
+
+{% if active_tab == 'servers' %}
+<section class="card">
+  <h2>Server Registry</h2>
+  <p class="ops-flash" style="margin-top:-8px;">
+    <span class="badge ok">active</span>
+    {{ ops_active_backend_label }}
+  </p>
+  <div class="queue-kpis" style="margin-top:-2px;">
+    <span class="badge {{ 'err' if server_policy.allow_public_server_endpoints else 'ok' }}">
+      public endpoint {{ 'on' if server_policy.allow_public_server_endpoints else 'off' }}
+    </span>
+    <span class="badge {{ 'warn' if server_policy.allow_hostname_server_endpoints else 'ok' }}">
+      hostname endpoint {{ 'on' if server_policy.allow_hostname_server_endpoints else 'off' }}
+    </span>
+    <span class="badge {{ 'ok' if server_policy.allow_zrok_server_endpoints else 'err' }}">
+      zrok endpoint {{ 'on' if server_policy.allow_zrok_server_endpoints else 'off' }}
+    </span>
+  </div>
+  {% if dispatch_unavailable %}
+    <p class="empty">Dispatch service unavailable.</p>
+  {% else %}
+    <form method="post" action="/ops/servers/add" class="server-form-grid">
+      <input type="text" name="name" placeholder="Server name (e.g. Desktop-LLM)" required />
+      <input type="text" name="base_url" placeholder="https://<your-share>.share.zrok.io (or http://192.168.x.x:18080)" required />
+      <input type="password" name="api_key" placeholder="x-api-key" required />
+      <button type="submit">Add Server</button>
+    </form>
+
+    <div class="queue-kpis">
+      <span class="badge warn">queue total {{ queue_summary.total }}</span>
+      <span class="badge warn">queued {{ queue_summary.queued }}</span>
+      <span class="badge warn">running {{ queue_summary.running }}</span>
+      <span class="badge ok">done {{ queue_summary.succeeded }}</span>
+      <span class="badge err">failed {{ queue_summary.failed }}</span>
+      <span class="badge err">cancelled {{ queue_summary.cancelled }}</span>
+    </div>
+
+    {% if servers %}
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Kind</th>
+            <th>Base URL</th>
+            <th>Auth</th>
+            <th>Active</th>
+            <th>Health</th>
+            <th>Last Error</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in servers %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td>{{ s.kind }}</td>
+            <td>{{ s.base_url or 'local' }}</td>
+            <td>
+              {% if s.kind == 'local' %}
+                <span class="badge ok">n/a</span>
+              {% elif s.has_api_key %}
+                <span class="badge ok">configured</span>
+              {% else %}
+                <span class="badge err">missing</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if s.server_id == active_server_id %}
+                <span class="dot-active"></span>Active
+              {% else %}
+                <span class="dot-inactive"></span>Inactive
+              {% endif %}
+            </td>
+            <td>
+              {% if s.health_status == 'healthy' %}
+                <span class="badge ok">healthy</span>
+              {% elif s.health_status == 'unreachable' %}
+                <span class="badge err">failed</span>
+              {% else %}
+                <span class="badge warn">unknown</span>
+              {% endif %}
+            </td>
+            <td>{{ s.last_error or '—' }}</td>
+            <td class="actions-row">
+              <form method="post" action="/ops/servers/{{ s.server_id }}/health-check" style="margin:0">
+                <button type="submit">Check</button>
+              </form>
+              <form method="post" action="/ops/servers/{{ s.server_id }}/activate" style="margin:0">
+                <button type="submit" {% if s.server_id == active_server_id %}disabled{% endif %}>Activate</button>
+              </form>
+              <form method="post" action="/ops/servers/{{ s.server_id }}/delete" style="margin:0">
+                <button type="submit" class="btn-danger" {% if s.kind == 'local' %}disabled{% endif %}>Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No servers configured.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
 
 {% endblock %}

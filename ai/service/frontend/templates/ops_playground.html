@@ -1012,7 +1012,7 @@
 
   async function getRuntimeStatus() {
     try {
-      var resp = await fetch('/health/ready', { cache: 'no-store' });
+      var resp = await fetch('/ops/playground/runtime', { cache: 'no-store' });
       if (!resp.ok) return defaultRuntime;
       var body = await resp.json();
       if (!body || !body.runtime) return defaultRuntime;

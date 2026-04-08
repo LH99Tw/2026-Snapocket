@@ -6,7 +6,19 @@
   <table class="kv-table">
     <tbody>
       <tr><th>Environment</th><td>{{ settings.app_env }}</td></tr>
+      <tr><th>Active Backend</th><td>{{ ops_active_backend_label }}</td></tr>
+      <tr><th>Active Server ID</th><td>{{ ops_active_server_id }}</td></tr>
+      <tr><th>Active Server Kind</th><td>{{ ops_active_server_kind }}</td></tr>
       <tr><th>Default Engine</th><td>{{ settings.default_engine }}</td></tr>
+      <tr><th>Dispatch Upstream Timeout</th><td>{{ settings.dispatch_upstream_timeout_s }} sec</td></tr>
+      <tr><th>API Key Required</th><td>{{ settings.require_api_key }}</td></tr>
+      <tr><th>Ops Basic Auth Required</th><td>{{ settings.require_ops_basic_auth }}</td></tr>
+      <tr><th>Allowed Clients (CIDR)</th><td>{{ settings.allowed_clients_raw }}</td></tr>
+      <tr><th>Trust X-Forwarded-For</th><td>{{ settings.trust_x_forwarded_for }}</td></tr>
+      <tr><th>Allow Public Endpoints</th><td>{{ settings.allow_public_server_endpoints }}</td></tr>
+      <tr><th>Allow Hostname Endpoints</th><td>{{ settings.allow_hostname_server_endpoints }}</td></tr>
+      <tr><th>Allow zrok Endpoints</th><td>{{ settings.allow_zrok_server_endpoints }}</td></tr>
+      <tr><th>Server Secret Key Configured</th><td>{{ server_secret_key_configured }}</td></tr>
       <tr><th>LLM Backend URL</th><td>{{ settings.llm_base_url }}</td></tr>
       <tr><th>Paddle Model</th><td>{{ settings.llm_model_paddle }}</td></tr>
       <tr><th>GLM Model</th><td>{{ settings.llm_model_glm }}</td></tr>

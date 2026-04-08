@@ -1,10 +1,18 @@
 # AI Service
 
-실행 기준 폴더: `ai/service`
+실행/운영 커맨드는 `ai/Makefile` 단일 진입점으로 관리합니다.
 
 ## 실행
 ```bash
+cd ai
 make up-build
+```
+
+자주 쓰는 명령:
+```bash
+make ps
+make logs
+make down
 ```
 
 ## 런타임

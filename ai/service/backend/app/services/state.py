@@ -12,6 +12,7 @@ from app.services.idempotency import IdempotencyStore
 from app.services.job_manager import JobManager
 from app.services.metrics import MetricsStore
 from app.services.cache import ResultCache
+from app.services.dispatch_service import DispatchService
 from app.services.image_processor import ImageProcessor
 from app.services.log_buffer import LogBuffer, attach_to_logger
 from app.services.model_probe import ModelAvailabilityProber
@@ -22,6 +23,8 @@ from app.services.persistence import PersistenceStore
 from app.services.pipeline import InferencePipeline
 from app.services.redis_queue import RedisJobManager
 from app.services.security_scan import MalwareScanner
+from app.services.secret_cipher import SecretCipher
+from app.services.server_registry import ServerRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,8 @@ class AppState:
     log_buffer: LogBuffer = None  # type: ignore[assignment]
     model_prober: ModelAvailabilityProber | None = None
     engine_gate: EngineRequestGate | None = None
+    server_registry: ServerRegistry | None = None
+    dispatch: DispatchService | None = None
 
 
 def build_app_state() -> AppState:
@@ -154,6 +159,23 @@ def build_app_state() -> AppState:
         command=settings.malware_scan_command,
         timeout_s=settings.malware_scan_timeout_s,
     )
+
+    cipher = SecretCipher(settings.aiops_server_secret_key)
+    server_registry = ServerRegistry(
+        persistence=persistence,
+        cipher=cipher,
+        allow_public_endpoints=settings.allow_public_server_endpoints,
+        allow_hostname_endpoints=settings.allow_hostname_server_endpoints,
+        allow_zrok_endpoints=settings.allow_zrok_server_endpoints,
+    )
+    dispatch = DispatchService(
+        server_registry=server_registry,
+        pipeline=pipeline,
+        job_manager=job_manager,
+        settings=settings,
+        router=router,
+        request_timeout_s=settings.dispatch_upstream_timeout_s,
+    )
     model_prober = None
     if settings.model_probe_enable:
         model_prober = ModelAvailabilityProber(
@@ -175,4 +197,6 @@ def build_app_state() -> AppState:
         log_buffer=log_buffer,
         model_prober=model_prober,
         engine_gate=EngineRequestGate(),
+        server_registry=server_registry,
+        dispatch=dispatch,
     )

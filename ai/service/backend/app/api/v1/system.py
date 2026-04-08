@@ -108,4 +108,11 @@ def system_status(request: Request, state: AppState = Depends(get_state)):
         "jobs": [j.model_dump() for j in state.job_manager.list_jobs()],
         "metrics": state.metrics.snapshot(),
     }
+    if state.dispatch is not None:
+        active = state.dispatch.active_server()
+        data["dispatch"] = {
+            "active_server_id": active.server_id,
+            "active_server_kind": str(getattr(active.kind, "value", active.kind)),
+            "active_backend": state.dispatch.active_backend_label(),
+        }
     return ok_response(request, data)

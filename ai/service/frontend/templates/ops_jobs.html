@@ -3,6 +3,18 @@
 
 <section class="card">
   <h2>Job Queue</h2>
+  <p class="ops-flash">
+    <span class="badge ok">active</span>
+    {{ ops_active_backend_label }}
+  </p>
+  <div class="queue-kpis" style="margin-bottom:12px;">
+    <span class="badge warn">total {{ ops_queue_summary.total }}</span>
+    <span class="badge warn">queued {{ ops_queue_summary.queued }}</span>
+    <span class="badge warn">running {{ ops_queue_summary.running }}</span>
+    <span class="badge ok">done {{ ops_queue_summary.succeeded }}</span>
+    <span class="badge err">failed {{ ops_queue_summary.failed }}</span>
+    <span class="badge err">cancelled {{ ops_queue_summary.cancelled }}</span>
+  </div>
 
   <form method="get" action="/ops/jobs" style="display:flex; gap:8px; margin-bottom:12px;">
     <select name="status_filter">
@@ -24,6 +36,9 @@
           <th>Status</th>
           <th>Created</th>
           <th>Updated</th>
+          <th>Attempt</th>
+          <th>Retry Limit</th>
+          <th>Timeout(s)</th>
           <th>Error</th>
           <th>Action</th>
         </tr>
@@ -42,6 +57,9 @@
           </td>
           <td>{{ j.created_at }}</td>
           <td>{{ j.updated_at }}</td>
+          <td>{{ j.attempt if j.attempt is defined else '-' }}</td>
+          <td>{{ j.max_retries if j.max_retries is defined else '-' }}</td>
+          <td>{{ j.timeout_s if j.timeout_s is defined else '-' }}</td>
           <td>{{ j.error or '—' }}</td>
           <td>
             <div style="display:flex; gap:6px;">

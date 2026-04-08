@@ -120,6 +120,22 @@ class PersistenceStore:
             Column("updated_at", DateTime(timezone=True), nullable=False, default=_utcnow),
         )
 
+        self.servers_table = Table(
+            "servers",
+            self.metadata,
+            Column("server_id", String(64), primary_key=True),
+            Column("name", String(80), nullable=False),
+            Column("kind", String(16), nullable=False, default="remote"),
+            Column("active", Boolean, nullable=False, default=False),
+            Column("base_url_enc", String(2048), nullable=True),
+            Column("api_key_enc", String(4096), nullable=True),
+            Column("health_status", String(32), nullable=False, default="unknown"),
+            Column("last_error", String(512), nullable=True),
+            Column("last_checked_at", DateTime(timezone=True), nullable=True),
+            Column("created_at", DateTime(timezone=True), nullable=False, default=_utcnow),
+            Column("updated_at", DateTime(timezone=True), nullable=False, default=_utcnow),
+        )
+
     def start(self) -> None:
         if not self.enabled:
             return
@@ -421,3 +437,145 @@ class PersistenceStore:
     @staticmethod
     def _idempotency_storage_key(route: str, idempotency_key: str) -> str:
         return f"{route}:{idempotency_key}"
+
+    def list_servers(self) -> list[dict[str, Any]]:
+        if self._engine is None:
+            return []
+        try:
+            with self._engine.connect() as conn:
+                rows = conn.execute(
+                    select(
+                        self.servers_table.c.server_id,
+                        self.servers_table.c.name,
+                        self.servers_table.c.kind,
+                        self.servers_table.c.active,
+                        self.servers_table.c.base_url_enc,
+                        self.servers_table.c.api_key_enc,
+                        self.servers_table.c.health_status,
+                        self.servers_table.c.last_error,
+                        self.servers_table.c.last_checked_at,
+                        self.servers_table.c.created_at,
+                        self.servers_table.c.updated_at,
+                    ).order_by(self.servers_table.c.created_at.asc())
+                ).all()
+            return [dict(row._mapping) for row in rows]
+        except Exception as exc:  # pragma: no cover - env-dependent
+            self._last_error = str(exc)
+            return []
+
+    def get_server(self, server_id: str) -> dict[str, Any] | None:
+        if self._engine is None:
+            return None
+        try:
+            with self._engine.connect() as conn:
+                row = conn.execute(
+                    select(
+                        self.servers_table.c.server_id,
+                        self.servers_table.c.name,
+                        self.servers_table.c.kind,
+                        self.servers_table.c.active,
+                        self.servers_table.c.base_url_enc,
+                        self.servers_table.c.api_key_enc,
+                        self.servers_table.c.health_status,
+                        self.servers_table.c.last_error,
+                        self.servers_table.c.last_checked_at,
+                        self.servers_table.c.created_at,
+                        self.servers_table.c.updated_at,
+                    ).where(self.servers_table.c.server_id == server_id)
+                ).first()
+            if not row:
+                return None
+            return dict(row._mapping)
+        except Exception as exc:  # pragma: no cover - env-dependent
+            self._last_error = str(exc)
+            return None
+
+    def get_active_server(self) -> dict[str, Any] | None:
+        if self._engine is None:
+            return None
+        try:
+            with self._engine.connect() as conn:
+                row = conn.execute(
+                    select(
+                        self.servers_table.c.server_id,
+                        self.servers_table.c.name,
+                        self.servers_table.c.kind,
+                        self.servers_table.c.active,
+                        self.servers_table.c.base_url_enc,
+                        self.servers_table.c.api_key_enc,
+                        self.servers_table.c.health_status,
+                        self.servers_table.c.last_error,
+                        self.servers_table.c.last_checked_at,
+                        self.servers_table.c.created_at,
+                        self.servers_table.c.updated_at,
+                    ).where(self.servers_table.c.active.is_(True))
+                ).first()
+            if not row:
+                return None
+            return dict(row._mapping)
+        except Exception as exc:  # pragma: no cover - env-dependent
+            self._last_error = str(exc)
+            return None
+
+    def upsert_server(self, values: dict[str, Any]) -> None:
+        if self._engine is None:
+            return
+        now = _utcnow()
+        row_values = {
+            "server_id": str(values.get("server_id") or "").strip(),
+            "name": str(values.get("name") or "").strip(),
+            "kind": str(values.get("kind") or "remote").strip(),
+            "active": bool(values.get("active")),
+            "base_url_enc": str(values.get("base_url_enc") or ""),
+            "api_key_enc": str(values.get("api_key_enc") or ""),
+            "health_status": str(values.get("health_status") or "unknown"),
+            "last_error": str(values.get("last_error") or ""),
+            "last_checked_at": values.get("last_checked_at"),
+            "updated_at": now,
+        }
+        if not row_values["server_id"]:
+            return
+        try:
+            with self._engine.begin() as conn:
+                existing = conn.execute(
+                    select(self.servers_table.c.server_id, self.servers_table.c.created_at).where(
+                        self.servers_table.c.server_id == row_values["server_id"]
+                    )
+                ).first()
+                if existing:
+                    conn.execute(
+                        update(self.servers_table)
+                        .where(self.servers_table.c.server_id == row_values["server_id"])
+                        .values(**row_values)
+                    )
+                else:
+                    row_values["created_at"] = now
+                    conn.execute(insert(self.servers_table).values(**row_values))
+            self._last_error = None
+        except Exception as exc:  # pragma: no cover - env-dependent
+            self._last_error = str(exc)
+
+    def set_active_server(self, server_id: str) -> None:
+        if self._engine is None:
+            return
+        try:
+            with self._engine.begin() as conn:
+                conn.execute(update(self.servers_table).values(active=False, updated_at=_utcnow()))
+                conn.execute(
+                    update(self.servers_table)
+                    .where(self.servers_table.c.server_id == server_id)
+                    .values(active=True, updated_at=_utcnow())
+                )
+            self._last_error = None
+        except Exception as exc:  # pragma: no cover - env-dependent
+            self._last_error = str(exc)
+
+    def delete_server(self, server_id: str) -> None:
+        if self._engine is None:
+            return
+        try:
+            with self._engine.begin() as conn:
+                conn.execute(delete(self.servers_table).where(self.servers_table.c.server_id == server_id))
+            self._last_error = None
+        except Exception as exc:  # pragma: no cover - env-dependent
+            self._last_error = str(exc)

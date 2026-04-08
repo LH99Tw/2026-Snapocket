@@ -44,6 +44,77 @@
 
 </section>
 
+<section class="grid two">
+  <article class="card">
+    <h2>Dispatch Overview</h2>
+    <div class="engine-row">
+      <div>
+        <span class="engine-name">{{ ops_active_backend_label }}</span>
+        <span class="engine-model">server_id={{ ops_active_server_id }} · kind={{ ops_active_server_kind }}</span>
+      </div>
+      {% if ops_dispatch_enabled %}
+        <span class="badge ok">active</span>
+      {% else %}
+        <span class="badge err">unavailable</span>
+      {% endif %}
+    </div>
+    <div class="engine-list" style="margin-top:10px;">
+      <div class="engine-row">
+        <div>
+          <span class="engine-name">paddle runtime</span>
+          <span class="engine-model">dispatch.active_runtime()</span>
+        </div>
+        {% if ops_runtime.paddle %}
+          <span class="badge ok">UP</span>
+        {% else %}
+          <span class="badge err">DOWN</span>
+        {% endif %}
+      </div>
+      <div class="engine-row">
+        <div>
+          <span class="engine-name">glm runtime</span>
+          <span class="engine-model">dispatch.active_runtime()</span>
+        </div>
+        {% if ops_runtime.glm %}
+          <span class="badge ok">UP</span>
+        {% else %}
+          <span class="badge err">DOWN</span>
+        {% endif %}
+      </div>
+    </div>
+  </article>
+
+  <article class="card">
+    <h2>Queue Summary</h2>
+    <div class="metric-grid">
+      <div class="metric-item">
+        <div class="metric-label">Total</div>
+        <div class="metric-value">{{ ops_queue_summary.total }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Queued</div>
+        <div class="metric-value">{{ ops_queue_summary.queued }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Running</div>
+        <div class="metric-value">{{ ops_queue_summary.running }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Succeeded</div>
+        <div class="metric-value">{{ ops_queue_summary.succeeded }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Failed</div>
+        <div class="metric-value">{{ ops_queue_summary.failed }}</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Cancelled</div>
+        <div class="metric-value">{{ ops_queue_summary.cancelled }}</div>
+      </div>
+    </div>
+  </article>
+</section>
+
 <!-- Active Models -->
 <section class="card">
   <h2>Active Models</h2>
