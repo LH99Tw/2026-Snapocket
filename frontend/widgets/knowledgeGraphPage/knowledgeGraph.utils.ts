@@ -1,4 +1,4 @@
-import type { ApiNode, ApiNodeCategory } from "@/features/graph";
+import type { ApiNode, ApiNodeCategory } from "@/entities/graph";
 import type { GraphNode, NodeCategory, NodeSize } from "./knowledgeGraph.type";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "./knowledgeGraph.constant";
 
