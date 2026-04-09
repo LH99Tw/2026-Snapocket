@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import type { LoginFormState } from '@/features/auth/loginForm.type'
-import { login } from '@/features/auth/api'
+import { login } from '@/entities/auth/api'
 import { ApiError } from '@/shared/api'
 
 export function LoginForm() {
