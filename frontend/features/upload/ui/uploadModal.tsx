@@ -28,6 +28,11 @@ export function UploadModal({ open, onClose, onUpload }: UploadModalProps) {
     [],
   )
 
+  // TODO: [API] uploadDocument(file) 호출 후 반환된 document_id를 상위로 전달해야 함.
+  //   현재는 File 객체만 onUpload로 넘기고 실제 업로드는 하지 않음.
+  //   연결 방식: const { document_id } = await uploadDocument(file, true)
+  //   → onUpload(file, document_id) 형태로 시그니처 변경 필요.
+  //   업로드 중 로딩 상태 및 오류 처리도 여기서 담당.
   const handleStartAnalysis = useCallback(() => {
     const file =
       selectedFile ??

@@ -30,7 +30,8 @@ export function AiInputBar() {
           aria-label="Ask AI about your knowledge graph"
         />
 
-        {/* 전송 버튼 */}
+        {/* TODO: [API] 전송 시 searchNodes(value) 호출 → 매칭된 노드 id 목록을 부모로 전달해 캔버스에서 하이라이트/포커스.
+              현재는 입력값만 관리하고 실제 검색 요청 없음. onSearch prop 추가 필요. */}
         <button
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
           style={{ background: value ? '#81ecff' : 'rgba(70,72,75,0.3)' }}

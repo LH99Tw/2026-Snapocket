@@ -60,7 +60,8 @@ export async function apiClient<T>(
   const { requireAuth = false, headers: rawHeaders, ...fetchOptions } = options;
 
   const headers = new Headers(rawHeaders as HeadersInit | undefined);
-  if (!headers.has("Content-Type")) {
+  // FormData는 브라우저가 boundary를 포함한 Content-Type을 자동 설정하므로 제외
+  if (!headers.has("Content-Type") && !(fetchOptions.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 

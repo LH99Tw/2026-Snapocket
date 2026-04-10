@@ -42,6 +42,7 @@ export function LoginForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* TODO: [API] Google OAuth 로그인 — 백엔드 OAuth 엔드포인트(POST /auth/oauth/google 또는 리다이렉트 URL) 연결 필요 */}
       <button
         type="button"
         className="flex items-center justify-center gap-3 w-full h-[54px] rounded-lg bg-snap-social border border-snap-border/20 text-snap-white font-inter text-base font-medium transition-colors hover:bg-[#2a2e33] cursor-pointer"
@@ -86,6 +87,7 @@ export function LoginForm() {
             >
               Password
             </label>
+            {/* TODO: [API] 비밀번호 재설정 — 관련 엔드포인트 확정 후 연결 */}
             <button
               type="button"
               className="font-inter text-[10px] text-snap-cyan tracking-[0.5px] font-semibold hover:text-snap-cyan/80 transition-colors"
