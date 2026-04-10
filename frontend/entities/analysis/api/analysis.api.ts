@@ -1,5 +1,13 @@
 import { apiClient } from '@/shared/api'
-import type { AnalysisStatus, AnalysisResult, ConfirmPayload } from '../model/types'
+import type { AnalysisStatus, AnalysisResult, ConfirmPayload, StartAnalysisResponse } from '../model/types'
+
+export async function startAnalysis(documentId: string): Promise<StartAnalysisResponse> {
+  const res = await apiClient<StartAnalysisResponse>(`/analysis/${documentId}/start`, {
+    method: 'POST',
+    requireAuth: true,
+  })
+  return res.data
+}
 
 export async function fetchAnalysisStatus(documentId: string): Promise<AnalysisStatus> {
   const res = await apiClient<AnalysisStatus>(`/analysis/${documentId}/status`, { requireAuth: true })
