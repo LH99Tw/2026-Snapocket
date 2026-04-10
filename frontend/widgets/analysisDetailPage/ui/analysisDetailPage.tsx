@@ -56,6 +56,7 @@ function rawTagName(label: string): string {
   return label.startsWith('#') ? label.slice(1) : label
 }
 
+// TODO: [Mock] 백엔드 연결 완료 후 isMockId 분기 전체 제거
 function isMockId(id: string): boolean {
   return id.startsWith('mock-')
 }
@@ -89,6 +90,7 @@ export function AnalysisDetailPage() {
   // ── 초기 로딩 ─────────────────────────────────────────────────────────────
 
   const loadResult = useCallback(async () => {
+    // TODO: [Mock] 백엔드 연결 후 아래 mock 분기 제거
     if (isMockId(id)) {
       const result = MOCK_RESULTS[id]
       if (!result) {
@@ -161,7 +163,7 @@ export function AnalysisDetailPage() {
   useEffect(() => {
     if (!id) return
 
-    // mock 데이터 처리
+    // TODO: [Mock] 백엔드 연결 후 아래 mock 분기 제거
     if (isMockId(id)) {
       const doc = MOCK_DOCUMENTS[id]
       if (!doc) {
@@ -316,6 +318,8 @@ export function AnalysisDetailPage() {
     }
   }
 
+  // TODO: [API] 태그 추가 — addDocumentTags(id, { tags: [rawTagName(label)] }) 호출 후 반환된 uuid를 tag.id로 사용.
+  //   현재는 Date.now()를 임시 id로 쓰고 있어 deleteDocumentTag 호출 시 실제 tag uuid를 알 수 없음.
   function handleAddTag() {
     const trimmed = newTag.trim()
     if (!trimmed) return
@@ -328,6 +332,8 @@ export function AnalysisDetailPage() {
     setAddingTag(false)
   }
 
+  // TODO: [API] 태그 삭제 — deleteDocumentTag(id, String(tagId)) 호출.
+  //   tag.id가 실제 uuid여야 하므로 위 handleAddTag API 연결 선행 필요.
   function handleRemoveTag(tagId: number) {
     setForm((f) => ({ ...f, tags: f.tags.filter((t) => t.id !== tagId) }))
   }

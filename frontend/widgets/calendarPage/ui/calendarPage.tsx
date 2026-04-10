@@ -21,6 +21,9 @@ const MONTH_NAMES = [
   'December',
 ]
 
+// TODO: [Mock] fetchCalendarMonth({ year, month }) 응답(CalendarDates)으로 교체.
+//   year/month state 변경 시마다 fetchCalendarMonth 재호출 → dates 상태로 관리.
+//   category 필터 칩이 생기면 category 파라미터도 함께 전달.
 /** 월별 Mock 이벤트 — key: "YYYY-MM-DD" */
 const MOCK_EVENTS: Record<string, { label: string; color: string }[]> = {
   '2025-10-03': [{ label: 'document 1', color: '#ac89ff' }],
@@ -128,9 +131,12 @@ export function CalendarPage() {
     d.getMonth() === today.getMonth() &&
     d.getFullYear() === today.getFullYear()
 
+  // TODO: [Mock] MOCK_EVENTS 대신 fetchCalendarMonth 결과 dates[toKey(d)] 사용
   const getEvents = (d: Date) => MOCK_EVENTS[toKey(d)] ?? []
 
-  // 검색: 이벤트 라벨 필터
+  // TODO: [API] 날짜 셀 클릭 시 fetchCalendarDay({ date: toKey(d) }) 호출 → 하루치 문서 목록 사이드패널/모달 표시
+  // TODO: [API] 검색어 입력 시 searchDocuments({ keyword: search }) 호출 후 결과 날짜 하이라이트.
+  //   현재는 로컬 MOCK_EVENTS 라벨 대상으로만 필터링하므로 실제 검색과 동작이 다름.
   const matchesSearch = (d: Date) => {
     if (!search.trim()) return true
     return getEvents(d).some((e) =>
@@ -138,6 +144,8 @@ export function CalendarPage() {
     )
   }
 
+  // TODO: [API] uploadDocument(file) 호출 후 반환된 document_id로 /analysis/{id} 이동.
+  //   현재는 토스트만 표시하고 실제 업로드 없이 종료됨.
   const handleUpload = useCallback((file: File) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     setUploadToast({ visible: true, fileName: file.name })
