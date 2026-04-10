@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }} — Snapocket AIOps</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/ops.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">⬡</div>
+      <div class="brand-text">
+        <span class="brand-name">Snapocket</span>
+        <span class="brand-sub">ML · AIOps</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/ops"            class="nav-item" data-path="/ops">
+        <span class="nav-icon">◈</span><span>Dashboard</span>
+      </a>
+      <a href="/ops/models"     class="nav-item" data-path="/ops/models">
+        <span class="nav-icon">◉</span><span>Models</span>
+      </a>
+      <a href="/ops/jobs"       class="nav-item" data-path="/ops/jobs">
+        <span class="nav-icon">◷</span><span>Jobs</span>
+      </a>
+      <a href="/ops/logs"       class="nav-item" data-path="/ops/logs">
+        <span class="nav-icon">≡</span><span>Logs</span>
+      </a>
+      <a href="/ops/playground" class="nav-item" data-path="/ops/playground">
+        <span class="nav-icon">⚗</span><span>Playground</span>
+      </a>
+      <a href="/ops/settings"   class="nav-item" data-path="/ops/settings">
+        <span class="nav-icon">⌘</span><span>Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="sys-status">
+        <span class="status-dot pulse"></span>
+        System Online
+      </span>
+    </div>
+  </aside>
+
+  <div class="layout">
+    <header class="page-header">
+      <h1 class="page-title">{{ title }}</h1>
+      <div class="header-right">
+        <span class="live-badge">
+          <span class="status-dot pulse"></span>Live
+        </span>
+        <span class="timestamp" id="clock"></span>
+      </div>
+    </header>
+    {% if ops_dispatch_enabled %}
+    <section class="dispatch-strip">
+      <span class="dispatch-chip">
+        <strong>Active:</strong> {{ ops_active_backend_label }}
+      </span>
+      <span class="dispatch-chip">
+        <strong>Server ID:</strong> {{ ops_active_server_id }}
+      </span>
+      <span class="dispatch-chip">
+        <strong>Kind:</strong> {{ ops_active_server_kind }}
+      </span>
+      <span class="dispatch-chip">
+        <strong>Queue:</strong>
+        {{ ops_queue_summary.queued }}q /
+        {{ ops_queue_summary.running }}r /
+        {{ ops_queue_summary.succeeded }}ok /
+        {{ ops_queue_summary.failed }}err
+      </span>
+      <span class="dispatch-chip">
+        <strong>Runtime:</strong>
+        paddle={{ 'up' if ops_runtime.paddle else 'down' }},
+        glm={{ 'up' if ops_runtime.glm else 'down' }}
+      </span>
+    </section>
+    {% endif %}
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script>
+    (function() {
+      var path = window.location.pathname;
+      document.querySelectorAll('.nav-item').forEach(function(link) {
+        var href = link.getAttribute('data-path');
+        if (href === '/ops') {
+          if (path === '/ops' || path === '/ops/') link.classList.add('active');
+        } else {
+          if (path === href || path.startsWith(href + '/')) link.classList.add('active');
+        }
+      });
+    })();
+    function tick() {
+      var el = document.getElementById('clock');
+      if (el) el.textContent = new Date().toLocaleTimeString('ko-KR', {
+        hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+      });
+    }
+    tick(); setInterval(tick, 1000);
+  </script>
+</body>
+</html>

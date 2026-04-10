@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin:0;">
+      Container Logs
+      <span style="font-size:12px; font-weight:400; font-family:'JetBrains Mono',monospace; color:var(--muted); margin-left:8px;">{{ container }}</span>
+    </h2>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <label style="font-size:13px; color:var(--text-dim);">Container</label>
+      <select id="container-select" style="font-size:0.85rem;">
+        {% for c in containers %}
+        <option value="{{ c }}" {% if c == container %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+      <label style="font-size:13px; color:var(--text-dim);">Tail</label>
+      <select id="tail-select" style="font-size:0.85rem;">
+        <option value="100"  {% if tail == 100  %}selected{% endif %}>100</option>
+        <option value="200"  {% if tail == 200  %}selected{% endif %}>200</option>
+        <option value="500"  {% if tail == 500  %}selected{% endif %}>500</option>
+        <option value="1000" {% if tail == 1000 %}selected{% endif %}>1000</option>
+        <option value="2000" {% if tail == 2000 %}selected{% endif %}>2000</option>
+      </select>
+      <button id="btn-reconnect" type="button">Reconnect</button>
+      <button id="btn-clear" type="button" class="btn-secondary">Clear</button>
+      <span id="status-badge" class="badge warn">connecting…</span>
+    </div>
+  </div>
+
+  <div class="log-terminal">
+    <div class="log-terminal-bar">
+      <span class="term-dot close"></span>
+      <span class="term-dot min"></span>
+      <span class="term-dot expand"></span>
+      <span class="term-title">docker logs -f {{ container }}</span>
+      <span id="line-count" style="margin-left:auto; font-size:10.5px; opacity:0.4; font-family:'JetBrains Mono',monospace;"></span>
+    </div>
+    <ul class="log-list" id="log-list"></ul>
+  </div>
+</section>
+
+<script>
+(function () {
+  var list    = document.getElementById('log-list');
+  var badge   = document.getElementById('status-badge');
+  var counter = document.getElementById('line-count');
+  var btnRec  = document.getElementById('btn-reconnect');
+  var btnClr  = document.getElementById('btn-clear');
+  var tailSel = document.getElementById('tail-select');
+  var contSel = document.getElementById('container-select');
+  var es      = null;
+  var lineCount = 0;
+  var autoScroll = true;
+
+  // ── Helpers ──────────────────────────────────────────
+  function classify(text) {
+    var t = text.toLowerCase();
+    if (/\b(error|exception|traceback|critical)\b/.test(t)) return 'error';
+    if (/\b(warn(?:ing)?)\b/.test(t))                        return 'warning';
+    if (/\b(debug)\b/.test(t))                               return 'debug';
+    return 'info';
+  }
+
+  function appendLine(text) {
+    var li   = document.createElement('li');
+    var cls  = classify(text);
+    li.className = 'log-line log-' + cls;
+
+    var ts = document.createElement('span');
+    ts.className = 'log-ts';
+    ts.textContent = new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+
+    var lvl = document.createElement('span');
+    lvl.className = 'log-lvl log-lvl-' + cls;
+    lvl.textContent = cls.toUpperCase().slice(0, 4);
+
+    var msg = document.createElement('span');
+    msg.className = 'log-msg';
+    msg.textContent = text;
+
+    li.append(ts, lvl, msg);
+    list.appendChild(li);
+    lineCount++;
+    counter.textContent = lineCount + ' lines';
+
+    // cap at 2000 DOM nodes to avoid memory bloat
+    while (list.children.length > 2000) {
+      list.removeChild(list.firstChild);
+    }
+
+    if (autoScroll) list.scrollTop = list.scrollHeight;
+  }
+
+  function setStatus(state) {
+    badge.className = 'badge';
+    if (state === 'live') {
+      badge.classList.add('ok');
+      badge.textContent = '● live';
+    } else if (state === 'error' || state === 'closed') {
+      badge.classList.add('err');
+      badge.textContent = state;
+    } else {
+      badge.classList.add('warn');
+      badge.textContent = state;
+    }
+  }
+
+  // ── SSE Connection ───────────────────────────────────
+  function connect() {
+    if (es) { es.close(); es = null; }
+    setStatus('connecting…');
+
+    var tail = tailSel.value;
+    var container = contSel.value;
+    var query = new URLSearchParams({ tail: tail, container: container }).toString();
+    es = new EventSource('/ops/logs/stream?' + query);
+
+    es.addEventListener('connected', function () {
+      setStatus('live');
+    });
+
+    es.addEventListener('error', function (e) {
+      setStatus('error');
+      if (e.data) appendLine('⚠ ' + e.data);
+    });
+
+    es.addEventListener('closed', function () {
+      setStatus('closed');
+      es.close();
+    });
+
+    es.onmessage = function (e) {
+      if (e.data) appendLine(e.data);
+    };
+
+    es.onerror = function () {
+      setStatus('reconnecting…');
+    };
+  }
+
+  // ── Controls ─────────────────────────────────────────
+  btnRec.addEventListener('click', function () {
+    lineCount = 0;
+    list.innerHTML = '';
+    counter.textContent = '';
+    connect();
+  });
+
+  btnClr.addEventListener('click', function () {
+    lineCount = 0;
+    list.innerHTML = '';
+    counter.textContent = '';
+  });
+
+  tailSel.addEventListener('change', function () {
+    lineCount = 0;
+    list.innerHTML = '';
+    counter.textContent = '';
+    connect();
+  });
+
+  contSel.addEventListener('change', function () {
+    lineCount = 0;
+    list.innerHTML = '';
+    counter.textContent = '';
+    connect();
+  });
+
+  // Pause auto-scroll when user scrolls up
+  list.addEventListener('scroll', function () {
+    autoScroll = list.scrollTop + list.clientHeight >= list.scrollHeight - 40;
+  });
+
+  // ── Start ────────────────────────────────────────────
+  connect();
+})();
+</script>
+
+{% endblock %}

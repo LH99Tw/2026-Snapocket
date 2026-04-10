@@ -22,6 +22,23 @@ docker compose up --build
 docker compose --profile dev up --build
 ```
 
+### AI 컨테이너 (별도 실행, 자동 동시 실행 안 함)
+```bash
+# 루트에서 AI만 별도 실행
+docker compose --profile ai up --build ai-dev
+```
+
+`ai` 프로필은 `ai-dev`와 함께 `llama-server` 컨테이너를 실행합니다.
+
+또는
+
+```bash
+cd ai
+make up-build
+```
+
+참고: `docker compose up` 또는 `docker compose --profile dev up`에는 AI 컨테이너가 포함되지 않습니다.
+
 ### 직접 실행
 
 **Frontend**
