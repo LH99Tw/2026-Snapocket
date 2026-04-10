@@ -1,0 +1,12 @@
+.git
+.pytest_cache
+__pycache__/
+*.py[cod]
+*.log
+.DS_Store
+.env
+.venv/
+
+backend/__pycache__/
+backend/app/**/__pycache__/
+frontend/**/.DS_Store

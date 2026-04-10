@@ -1,51 +1,11 @@
 services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"   # Next.js
-      - "8000:8000"   # FastAPI
-    environment:
-      - APP_ENV=production
-    networks:
-      - default
-      - shared_snapocket
-    restart: unless-stopped
-
-  # ── Local dev: run each service separately ─────────────────────────────────
-  frontend-dev:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile.dev
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
-    profiles: [dev]
-
-  backend-dev:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
-    networks:
-      - default
-      - shared_snapocket
-    profiles: [dev]
-
-
-
-  # ── AI dev: opt-in only (never auto-start with default/dev profiles) ──────
   llama-server:
     image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: aiops-llama
     restart: unless-stopped
     cpus: "${AI_LLAMA_CPUS:-6.0}"
     ports:
-      - "${AI_LLAMA_LOCAL_BIND_IP:-127.0.0.1}:${AI_LLAMA_LOCAL_PORT:-18115}:8080"
+      - "${AI_LLAMA_BIND_IP:-127.0.0.1}:${AI_LLAMA_PORT:-18114}:8080"
     command:
       - -m
       - /models/${AI_LLAMA_MODEL_FILE:-PaddleOCR-VL-1.5-BF16.gguf}
@@ -70,16 +30,16 @@ services:
       - -ngl
       - "${AI_LLAMA_GPU_LAYERS:-0}"
     volumes:
-      - ./ai/model:/models:ro
+      - ../model:/models:ro
     networks:
-      - default
-      - shared_snapocket
-    profiles: [ai]
+      ai_internal: {}
 
-  ai-dev:
+  aiops-api:
     build:
-      context: ./ai/service
+      context: .
       dockerfile: backend/Dockerfile.dev
+    container_name: aiops-api
+    restart: unless-stopped
     environment:
       APP_ENV: ${AI_APP_ENV:-container}
       AIOPS_API_KEY: ${AIOPS_API_KEY:-}
@@ -102,16 +62,27 @@ services:
       LLM_MAX_TOKENS: ${AI_LLAMACPP_MAX_TOKENS:-96}
       PLAYGROUND_TIMEOUT_S: ${AI_PLAYGROUND_TIMEOUT_S:-120}
     ports:
-      - "${AI_AIOPS_LOCAL_BIND_IP:-127.0.0.1}:${AI_AIOPS_LOCAL_PORT:-18081}:8080"
+      - "${AI_AIOPS_BIND_IP:-0.0.0.0}:${AI_AIOPS_PORT:-18080}:8080"
     depends_on:
       - llama-server
     volumes:
-      - ./ai/data:/app/data
+      - ../data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
-      - default
-      - shared_snapocket
-    profiles: [ai]
+      ai_internal: {}
+      shared_snapocket:
+        aliases:
+          - aiops-api
+          - snapocket-ai
 
 networks:
+  ai_internal:
+    name: ${AI_AIOPS_INTERNAL_NETWORK:-aiops-net}
   shared_snapocket:
+    external: true
     name: ${AI_AIOPS_SHARED_NETWORK:-snapocket-shared-net}

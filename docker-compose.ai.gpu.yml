@@ -1,0 +1,16 @@
+services:
+  llama-server:
+    gpus: all
+    command:
+      - -m
+      - /models/${AI_LLAMA_MODEL_FILE:-PaddleOCR-VL-1.5-BF16.gguf}
+      - --mmproj
+      - /models/${AI_LLAMA_MMPROJ_FILE:-mmproj-BF16.gguf}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - -c
+      - "${AI_LLAMA_CTX_SIZE:-8192}"
+      - -ngl
+      - "${AI_LLAMA_GPU_LAYERS_GPU:-99}"

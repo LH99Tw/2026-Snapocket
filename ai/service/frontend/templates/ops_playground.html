@@ -1,0 +1,1427 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+/* ═══ PLAYGROUND SCOPED STYLES ═══════════════════════════ */
+.pg-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ── Drop Zone ── */
+.drop-zone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 36px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--primary);
+  background: var(--primary-dim);
+}
+.drop-zone-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+  display: block;
+  transition: transform 0.2s;
+}
+.drop-zone:hover .drop-zone-icon { transform: scale(1.08); }
+.drop-zone-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.drop-zone-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.drop-zone.has-file {
+  border-style: solid;
+  border-color: var(--primary);
+  padding: 16px;
+}
+
+.file-preview {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.file-preview.show { display: flex; }
+.file-thumb {
+  width: 56px; height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.file-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 7px; }
+.file-info { flex: 1; min-width: 0; }
+.file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.file-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+  box-shadow: none;
+}
+.file-remove:hover { color: var(--red); background: var(--red-dim); box-shadow: none; }
+
+/* ── Controls ── */
+.pg-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+.ctrl-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.ctrl-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ctrl-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.ctrl-group select,
+.ctrl-group input {
+  width: 100%;
+}
+.ctrl-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+.ctrl-toggle input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+}
+.ctrl-help {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.run-btn {
+  padding: 9px 20px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  border-radius: var(--radius);
+}
+.run-btn .btn-arrow { font-size: 14px; transition: transform 0.15s; }
+.run-btn:hover .btn-arrow { transform: translateX(3px); }
+.run-btn:disabled { opacity: 0.4; }
+.run-btn.running {
+  background: var(--amber);
+  animation: btn-pulse 1.2s ease-in-out infinite;
+}
+@keyframes btn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+/* ── Pipeline DAG ── */
+.pipeline-section {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.pipeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.pipeline-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.pipeline-runtime {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pipeline-runtime span { color: var(--primary); font-weight: 500; }
+
+.pipe-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.pipe-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.node-bubble {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.pipe-node[data-state="idle"] .node-bubble {
+  background: var(--bg);
+  border-color: var(--border);
+  opacity: 0.55;
+}
+.pipe-node[data-state="running"] .node-bubble {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-dim);
+  animation: node-pulse 1.3s ease-in-out infinite;
+}
+@keyframes node-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--primary-dim); }
+  50% { box-shadow: 0 0 0 8px rgba(232,125,13,0); }
+}
+.pipe-node[data-state="done"] .node-bubble {
+  background: var(--green-dim);
+  border-color: var(--green);
+  opacity: 1;
+}
+.pipe-node[data-state="error"] .node-bubble {
+  background: var(--red-dim);
+  border-color: var(--red);
+  opacity: 1;
+}
+
+.node-check {
+  position: absolute;
+  top: -6px; right: -6px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  color: white;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  display: none;
+}
+.pipe-node[data-state="done"] .node-check { display: flex; }
+
+.node-err-badge {
+  position: absolute;
+  top: -6px; right: -6px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--red);
+  color: white;
+  font-size: 10px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.pipe-node[data-state="error"] .node-err-badge { display: flex; }
+
+.node-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.pipe-node[data-state="running"] .node-label { color: var(--primary); }
+.pipe-node[data-state="done"]    .node-label { color: var(--green); }
+.pipe-node[data-state="error"]   .node-label { color: var(--red); }
+
+.node-time {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  min-height: 14px;
+}
+.pipe-node[data-state="done"] .node-time { color: var(--green); }
+
+.pipe-connector {
+  flex: 1;
+  height: 2px;
+  min-width: 20px;
+  background: var(--border);
+  position: relative;
+  margin-bottom: 30px;
+  transition: background 0.3s;
+}
+.pipe-connector.active {
+  background: linear-gradient(90deg, var(--green), var(--primary));
+}
+.pipe-connector::after {
+  content: '';
+  position: absolute;
+  right: -5px; top: -4px;
+  width: 10px; height: 10px;
+  border-top: 2px solid var(--border);
+  border-right: 2px solid var(--border);
+  transform: rotate(45deg);
+  transition: border-color 0.3s;
+}
+.pipe-connector.active::after {
+  border-color: var(--primary);
+}
+
+/* ── Step Detail Panel ── */
+.step-detail {
+  margin-top: 16px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+.step-detail.hidden { display: none; }
+.step-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.step-detail-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.03em;
+}
+.step-detail-body {
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  background: var(--surface);
+  max-height: 140px;
+  overflow-y: auto;
+}
+.step-kv { display: flex; gap: 12px; }
+.step-kv-key { color: var(--muted); min-width: 100px; }
+.step-kv-val { color: var(--text); }
+
+/* ── Results ── */
+.result-section {
+  margin-top: 20px;
+}
+.result-section.hidden { display: none; }
+
+.result-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0;
+}
+.rtab {
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  border-radius: 0;
+  transition: all 0.15s;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+.rtab:hover { color: var(--text); background: none; box-shadow: none; }
+.rtab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: none;
+  box-shadow: none;
+}
+
+.rtab-panel {
+  display: none;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.rtab-panel.active { display: block; }
+
+/* Summary stats */
+.result-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.rstat {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  text-align: center;
+}
+.rstat-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary);
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.rstat-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.result-text-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text);
+  white-space: pre-wrap;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* Blocks table */
+.blocks-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.blocks-table {
+  font-size: 12px;
+  min-width: 1220px;
+  margin: 0;
+}
+.blocks-table th { font-size: 10px; }
+.block-text-cell {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.block-meta-cell {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.blocks-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.blocks-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.blocks-filter label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.blocks-filter select {
+  min-width: 180px;
+}
+.blocks-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Domain entities */
+.entity-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.entity-group {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.entity-group-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.entity-tag {
+  display: inline-block;
+  background: var(--blue-dim);
+  color: var(--blue);
+  border: 1px solid rgba(26,115,232,0.2);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-family: 'JetBrains Mono', monospace;
+  margin: 2px;
+}
+
+/* JSON viewer */
+.json-viewer {
+  background: #1E1E1E;
+  border-radius: var(--radius);
+  padding: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.75;
+  overflow: auto;
+  max-height: 480px;
+  color: #D4D4D4;
+}
+.json-key   { color: #9CDCFE; }
+.json-str   { color: #CE9178; }
+.json-num   { color: #B5CEA8; }
+.json-bool  { color: #569CD6; }
+.json-null  { color: #569CD6; }
+
+/* Error state */
+.pg-error {
+  background: var(--red-dim);
+  border: 1px solid rgba(217,48,37,0.3);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  color: var(--red);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  display: none;
+  margin-top: 14px;
+}
+.pg-error.show { display: block; }
+
+@media (max-width: 900px) {
+  .pg-grid { grid-template-columns: 1fr; }
+  .result-stats { grid-template-columns: 1fr 1fr; }
+  .entity-groups { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="pg-grid">
+
+  <!-- ── LEFT: Upload + Controls ── -->
+  <div>
+    <article class="card" style="margin-bottom:0">
+      <h2>File Input</h2>
+
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png">
+        <div id="dropIdle">
+          <span class="drop-zone-icon">📂</span>
+          <div class="drop-zone-title">파일을 드래그하거나 클릭하세요</div>
+          <div class="drop-zone-sub">PDF · JPG · PNG · JPEG — max {{ max_upload_mb }}MB</div>
+        </div>
+        <div class="file-preview" id="filePreview">
+          <div class="file-thumb" id="fileThumb">📄</div>
+          <div class="file-info">
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-meta" id="fileMeta">—</div>
+          </div>
+          <button class="file-remove" id="fileRemove" title="파일 제거">✕</button>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="pg-controls">
+        <div class="ctrl-row">
+          <div class="ctrl-group">
+            <span class="ctrl-label">Engine (Fixed)</span>
+            <select id="engineSelect" disabled>
+              <option value="auto">auto (Models page active model)</option>
+            </select>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">Doc ID (optional)</span>
+            <input type="text" id="docIdInput" placeholder="자동 생성">
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div class="ctrl-group">
+            <label class="ctrl-toggle" for="vlmVerifyCheck">
+              <input type="checkbox" id="vlmVerifyCheck">
+              <span>VLM 선행 + OCR 검증 분기 (실험)</span>
+            </label>
+            <div class="ctrl-help">구조는 VLM 기준으로 유지하고 OCR로 숫자/기호 라인 교정을 시도합니다.</div>
+          </div>
+        </div>
+        <button class="run-btn" id="runBtn" disabled>
+          <span>▶ Inference 실행</span>
+          <span class="btn-arrow">→</span>
+        </button>
+      </div>
+
+      <div class="pg-error" id="pgError"></div>
+    </article>
+  </div>
+
+  <!-- ── RIGHT: Pipeline + Results ── -->
+  <div>
+    <!-- Pipeline DAG -->
+    <div class="pipeline-section">
+      <div class="pipeline-header">
+        <span class="pipeline-title">Pipeline Execution</span>
+        <span class="pipeline-runtime" id="pipeRuntime">
+          <span id="totalMs">—</span>
+        </span>
+      </div>
+
+      <div class="pipe-track">
+
+        <div class="pipe-node" data-step="upload" data-state="idle">
+          <div class="node-bubble">
+            📄
+            <span class="node-check">✓</span>
+            <span class="node-err-badge">✕</span>
+          </div>
+          <div class="node-label">Upload</div>
+          <div class="node-time" id="t-upload">—</div>
+        </div>
+
+        <div class="pipe-connector" id="conn-1"></div>
+
+        <div class="pipe-node" data-step="validate" data-state="idle">
+          <div class="node-bubble">
+            🔍
+            <span class="node-check">✓</span>
+            <span class="node-err-badge">✕</span>
+          </div>
+          <div class="node-label">Validate</div>
+          <div class="node-time" id="t-validate">—</div>
+        </div>
+
+        <div class="pipe-connector" id="conn-2"></div>
+
+        <div class="pipe-node" data-step="route" data-state="idle">
+          <div class="node-bubble">
+            ⚡
+            <span class="node-check">✓</span>
+            <span class="node-err-badge">✕</span>
+          </div>
+          <div class="node-label">Route</div>
+          <div class="node-time" id="t-route">—</div>
+        </div>
+
+        <div class="pipe-connector" id="conn-3"></div>
+
+        <div class="pipe-node" data-step="ocr" data-state="idle">
+          <div class="node-bubble">
+            🤖
+            <span class="node-check">✓</span>
+            <span class="node-err-badge">✕</span>
+          </div>
+          <div class="node-label">OCR</div>
+          <div class="node-time" id="t-ocr">—</div>
+        </div>
+
+        <div class="pipe-connector" id="conn-4"></div>
+
+        <div class="pipe-node" data-step="transform" data-state="idle">
+          <div class="node-bubble">
+            ✨
+            <span class="node-check">✓</span>
+            <span class="node-err-badge">✕</span>
+          </div>
+          <div class="node-label">Transform</div>
+          <div class="node-time" id="t-transform">—</div>
+        </div>
+
+        <div class="pipe-connector" id="conn-5"></div>
+
+        <div class="pipe-node" data-step="done" data-state="idle">
+          <div class="node-bubble">
+            📊
+            <span class="node-check">✓</span>
+            <span class="node-err-badge">✕</span>
+          </div>
+          <div class="node-label">Result</div>
+          <div class="node-time" id="t-done">—</div>
+        </div>
+
+      </div>
+
+      <!-- Step Detail Panel -->
+      <div class="step-detail hidden" id="stepDetail">
+        <div class="step-detail-header">
+          <span id="stepDetailIcon">📄</span>
+          <span class="step-detail-name" id="stepDetailName">Upload</span>
+          <span class="badge ok" id="stepDetailBadge" style="margin-left:auto"></span>
+        </div>
+        <div class="step-detail-body" id="stepDetailBody"></div>
+      </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="result-section hidden" id="resultSection">
+      <div class="result-tabs">
+        <button class="rtab active" data-tab="summary">Overview</button>
+        <button class="rtab" data-tab="rawtext">Raw Text</button>
+        <button class="rtab" data-tab="corrected">Corrected</button>
+        <button class="rtab" data-tab="blocks">Blocks</button>
+        <button class="rtab" data-tab="domain">Domain</button>
+        <button class="rtab" data-tab="json">JSON</button>
+      </div>
+
+      <!-- Overview -->
+      <div class="rtab-panel active" id="rtab-summary">
+        <div class="result-stats">
+          <div class="rstat">
+            <div class="rstat-val" id="rs-engine">—</div>
+            <div class="rstat-label">Engine</div>
+          </div>
+          <div class="rstat">
+            <div class="rstat-val" id="rs-confidence">—</div>
+            <div class="rstat-label">Confidence</div>
+          </div>
+          <div class="rstat">
+            <div class="rstat-val" id="rs-blocks">—</div>
+            <div class="rstat-label">Blocks</div>
+          </div>
+          <div class="rstat">
+            <div class="rstat-val" id="rs-latency">—</div>
+            <div class="rstat-label">Latency</div>
+          </div>
+        </div>
+        <table>
+          <tbody>
+            <tr><td style="color:var(--muted);width:130px">Doc ID</td><td id="rs-docid" style="font-family:monospace;font-size:12px">—</td></tr>
+            <tr><td style="color:var(--muted)">Filename</td><td id="rs-filename">—</td></tr>
+            <tr><td style="color:var(--muted)">Content Type</td><td id="rs-ctype">—</td></tr>
+            <tr><td style="color:var(--muted)">Doc Type</td><td id="rs-doctype">—</td></tr>
+            <tr><td style="color:var(--muted)">Title</td><td id="rs-title">—</td></tr>
+            <tr><td style="color:var(--muted)">VLM→OCR Verify</td><td id="rs-verify">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Raw Text -->
+      <div class="rtab-panel" id="rtab-rawtext">
+        <pre class="result-text-box" id="rs-rawtext">—</pre>
+      </div>
+
+      <!-- Corrected Text -->
+      <div class="rtab-panel" id="rtab-corrected">
+        <pre class="result-text-box" id="rs-corrected">—</pre>
+      </div>
+
+      <!-- Blocks -->
+      <div class="rtab-panel" id="rtab-blocks">
+        <div class="blocks-toolbar">
+          <div class="blocks-filter">
+            <label for="blocksTypeFilter">Type Filter</label>
+            <select id="blocksTypeFilter">
+              <option value="all">all</option>
+              <option value="text">text</option>
+              <option value="table">table</option>
+              <option value="form">form</option>
+              <option value="header">header</option>
+              <option value="footer">footer</option>
+              <option value="title">title</option>
+              <option value="unknown">unknown</option>
+            </select>
+          </div>
+          <div class="blocks-count" id="blocksFilterCount">0 / 0 blocks</div>
+        </div>
+        <div class="blocks-wrap">
+          <table class="blocks-table">
+            <thead>
+              <tr>
+                <th>Block ID</th>
+                <th>Page</th>
+                <th>Type</th>
+                <th>Table ID</th>
+                <th>Row</th>
+                <th>Col</th>
+                <th>Span</th>
+                <th>Order</th>
+                <th>Parent</th>
+                <th>Confidence</th>
+                <th>Text</th>
+              </tr>
+            </thead>
+            <tbody id="rs-blocks-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Domain -->
+      <div class="rtab-panel" id="rtab-domain">
+        <div id="rs-domain-content"></div>
+      </div>
+
+      <!-- JSON -->
+      <div class="rtab-panel" id="rtab-json">
+        <pre class="json-viewer" id="rs-json">—</pre>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  /* ── State ── */
+  var selectedFile = null;
+  var isRunning = false;
+  var inferResult = null;
+  var serverTimeoutMs = {{ playground_timeout_ms }};
+  var activeEngine = '{{ active_engine }}';
+  var modelMap = {
+    paddle: {{ model_map.paddle|tojson }},
+    glm: {{ model_map.glm|tojson }}
+  };
+  var defaultRuntime = {
+    paddle: {{ 'true' if runtime_engines.paddle else 'false' }},
+    glm: {{ 'true' if runtime_engines.glm else 'false' }}
+  };
+
+  /* ── Elements ── */
+  var dropZone    = document.getElementById('dropZone');
+  var fileInput   = document.getElementById('fileInput');
+  var dropIdle    = document.getElementById('dropIdle');
+  var filePreview = document.getElementById('filePreview');
+  var fileThumb   = document.getElementById('fileThumb');
+  var fileNameEl  = document.getElementById('fileName');
+  var fileMetaEl  = document.getElementById('fileMeta');
+  var fileRemove  = document.getElementById('fileRemove');
+  var runBtn      = document.getElementById('runBtn');
+  var vlmVerifyCheck = document.getElementById('vlmVerifyCheck');
+  var pgError     = document.getElementById('pgError');
+  var resultSection = document.getElementById('resultSection');
+  var stepDetail  = document.getElementById('stepDetail');
+  var blocksTypeFilter = document.getElementById('blocksTypeFilter');
+  var blocksFilterCount = document.getElementById('blocksFilterCount');
+  var allBlocks = [];
+
+  if (blocksTypeFilter) {
+    blocksTypeFilter.addEventListener('change', function() {
+      renderBlocksTable();
+    });
+  }
+
+  /* ── File Handling ── */
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', function() {
+    dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+
+  fileRemove.addEventListener('click', function(e) {
+    e.stopPropagation();
+    clearFile();
+  });
+
+  function setFile(f) {
+    selectedFile = f;
+    fileNameEl.textContent = f.name;
+    fileMetaEl.textContent = formatBytes(f.size) + ' · ' + f.type;
+    dropIdle.style.display = 'none';
+    filePreview.classList.add('show');
+    dropZone.classList.add('has-file');
+    runBtn.disabled = false;
+
+    /* image preview */
+    if (f.type.startsWith('image/')) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        fileThumb.innerHTML = '<img src="' + ev.target.result + '" alt="preview">';
+      };
+      reader.readAsDataURL(f);
+    } else {
+      fileThumb.textContent = '📄';
+    }
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    fileInput.value = '';
+    fileNameEl.textContent = '—';
+    fileMetaEl.textContent = '—';
+    fileThumb.textContent = '📄';
+    fileThumb.innerHTML = '📄';
+    filePreview.classList.remove('show');
+    dropIdle.style.display = '';
+    dropZone.classList.remove('has-file');
+    runBtn.disabled = true;
+    allBlocks = [];
+    if (blocksTypeFilter) blocksTypeFilter.value = 'all';
+    if (blocksFilterCount) blocksFilterCount.textContent = '0 / 0 blocks';
+    resetPipeline();
+    hideResults();
+    hideError();
+  }
+
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(2) + ' MB';
+  }
+
+  /* ── Pipeline ── */
+  var steps = ['upload','validate','route','ocr','transform','done'];
+  var stepIcons = { upload:'📄', validate:'🔍', route:'⚡', ocr:'🤖', transform:'✨', done:'📊' };
+  var stepTimes = {};
+
+  function resetPipeline() {
+    steps.forEach(function(s) {
+      setNodeState(s, 'idle');
+      var t = document.getElementById('t-' + s);
+      if (t) t.textContent = '—';
+    });
+    for (var i = 1; i <= 5; i++) {
+      var c = document.getElementById('conn-' + i);
+      if (c) c.classList.remove('active');
+    }
+    document.getElementById('totalMs').textContent = '—';
+    stepDetail.classList.add('hidden');
+    stepTimes = {};
+  }
+
+  function setNodeState(step, state) {
+    var node = document.querySelector('[data-step="' + step + '"]');
+    if (node) node.setAttribute('data-state', state);
+  }
+
+  function markConnector(idx) {
+    var c = document.getElementById('conn-' + idx);
+    if (c) c.classList.add('active');
+  }
+
+  function showStepDetail(step, lines) {
+    var iconEl = document.getElementById('stepDetailIcon');
+    var nameEl = document.getElementById('stepDetailName');
+    var bodyEl = document.getElementById('stepDetailBody');
+    var badgeEl = document.getElementById('stepDetailBadge');
+
+    iconEl.textContent = stepIcons[step] || '◉';
+    nameEl.textContent = step.toUpperCase();
+    badgeEl.textContent = 'running';
+    badgeEl.className = 'badge warn';
+    bodyEl.innerHTML = lines.map(function(l) {
+      return '<div class="step-kv"><span class="step-kv-key">' + l[0] + '</span><span class="step-kv-val">' + l[1] + '</span></div>';
+    }).join('');
+    stepDetail.classList.remove('hidden');
+  }
+
+  function completeStepDetail(step) {
+    var badgeEl = document.getElementById('stepDetailBadge');
+    var t = stepTimes[step];
+    badgeEl.textContent = t ? t + 'ms' : 'done';
+    badgeEl.className = 'badge ok';
+  }
+
+  function sleep(ms) {
+    return new Promise(function(r) { setTimeout(r, ms); });
+  }
+
+  async function getRuntimeStatus() {
+    try {
+      var resp = await fetch('/ops/playground/runtime', { cache: 'no-store' });
+      if (!resp.ok) return defaultRuntime;
+      var body = await resp.json();
+      if (!body || !body.runtime) return defaultRuntime;
+      return {
+        paddle: !!body.runtime.paddle,
+        glm: !!body.runtime.glm
+      };
+    } catch (_err) {
+      return defaultRuntime;
+    }
+  }
+
+  function extractErrorMessage(payload, fallback) {
+    if (payload == null) return fallback || 'Unknown error';
+    if (typeof payload === 'string') return payload;
+    if (payload.error != null) {
+      if (typeof payload.error === 'string') return payload.error;
+      if (typeof payload.error === 'object') {
+        if (payload.error.code && payload.error.message) {
+          return payload.error.code + ': ' + payload.error.message;
+        }
+        if (payload.error.message) return payload.error.message;
+        return JSON.stringify(payload.error);
+      }
+    }
+    if (payload.detail != null) {
+      if (typeof payload.detail === 'string') return payload.detail;
+      return JSON.stringify(payload.detail);
+    }
+    return JSON.stringify(payload);
+  }
+
+  function resolvePlannedRoute(requestedEngine, runtime) {
+    var chosen = requestedEngine;
+    if (requestedEngine === 'auto') {
+      if (activeEngine === 'paddle' && runtime.paddle) chosen = 'paddle';
+      else if (activeEngine === 'glm' && runtime.glm) chosen = 'glm';
+      else chosen = 'auto';
+    }
+    return {
+      engine: chosen,
+      model: modelMap[chosen] || 'unresolved',
+      endpoint: '/ops/playground/infer'
+    };
+  }
+
+  /* ── Run Inference ── */
+  runBtn.addEventListener('click', function() {
+    if (!selectedFile || isRunning) return;
+    runInference();
+  });
+
+  async function runInference() {
+    isRunning = true;
+    runBtn.disabled = true;
+    runBtn.classList.add('running');
+    runBtn.querySelector('span').textContent = '⟳ 추론 중…';
+    hideResults();
+    hideError();
+    resetPipeline();
+
+    var wallStart = Date.now();
+
+    /* ── Step 1: Upload ── */
+    setNodeState('upload', 'running');
+    showStepDetail('upload', [
+      ['filename', selectedFile.name],
+      ['size', formatBytes(selectedFile.size)],
+      ['type', selectedFile.type]
+    ]);
+    await sleep(120);
+    var t1 = Date.now() - wallStart;
+    stepTimes['upload'] = t1;
+    document.getElementById('t-upload').textContent = t1 + 'ms';
+    setNodeState('upload', 'done');
+    completeStepDetail('upload');
+    markConnector(1);
+
+    /* ── Step 2: Validate ── */
+    setNodeState('validate', 'running');
+    showStepDetail('validate', [
+      ['max_upload_mb', '{{ max_upload_mb }}'],
+      ['content_type', selectedFile.type],
+      ['size_ok', selectedFile.size < {{ max_upload_mb }} * 1024 * 1024 ? 'true' : 'false']
+    ]);
+    await sleep(150);
+
+    var t2 = Date.now() - wallStart;
+    stepTimes['validate'] = t2 - t1;
+    document.getElementById('t-validate').textContent = stepTimes['validate'] + 'ms';
+    setNodeState('validate', 'done');
+    completeStepDetail('validate');
+    markConnector(2);
+
+    /* ── Step 3: Route ── */
+    var runtime = await getRuntimeStatus();
+    var requestedEngine = document.getElementById('engineSelect').value;
+    var unavailable = false;
+    if (requestedEngine === 'auto') {
+      if (activeEngine !== 'paddle' && activeEngine !== 'glm') unavailable = true;
+      if (activeEngine === 'paddle' && !runtime.paddle) unavailable = true;
+      if (activeEngine === 'glm' && !runtime.glm) unavailable = true;
+    }
+
+    var planned = resolvePlannedRoute(requestedEngine, runtime);
+    var verifyEnabled = !!(vlmVerifyCheck && vlmVerifyCheck.checked);
+    setNodeState('route', 'running');
+    showStepDetail('route', [
+      ['engine_hint', requestedEngine],
+      ['default_engine', '{{ default_engine }}'],
+      ['verify_branch', verifyEnabled ? 'enabled' : 'disabled'],
+      ['runtime', 'paddle=' + runtime.paddle + ', glm=' + runtime.glm],
+      ['resolved_engine', planned.engine],
+      ['model', planned.model]
+    ]);
+    await sleep(200);
+    if (unavailable) {
+      setNodeState('route', 'error');
+      showError('활성 모델이 없거나(active model), 활성 모델 런타임이 준비되지 않았습니다. Models 페이지에서 먼저 활성화하세요.');
+      finishRun();
+      return;
+    }
+    var t3 = Date.now() - wallStart;
+    stepTimes['route'] = t3 - t2;
+    document.getElementById('t-route').textContent = stepTimes['route'] + 'ms';
+    setNodeState('route', 'done');
+    completeStepDetail('route');
+    markConnector(3);
+
+    /* Build request after route validation */
+    var fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('engine_hint', requestedEngine);
+    fd.append('vlm_ocr_verify', verifyEnabled ? 'true' : 'false');
+    var docId = document.getElementById('docIdInput').value.trim();
+    if (docId) fd.append('doc_id', docId);
+
+    /* ── Step 4: OCR (awaiting response) ── */
+    setNodeState('ocr', 'running');
+    var waitStarted = Date.now();
+    var waitTicker = setInterval(function() {
+      var elapsed = Date.now() - waitStarted;
+      showStepDetail('ocr', [
+        ['engine', planned.engine],
+        ['model', planned.model],
+        ['verify_branch', verifyEnabled ? 'enabled' : 'disabled'],
+        ['request', planned.endpoint],
+        ['backend', '{{ playground_backend_label }}'],
+        ['status', 'waiting… ' + elapsed + 'ms']
+      ]);
+    }, 300);
+
+    var resp, data, timerId, controller;
+    try {
+      controller = new AbortController();
+      timerId = setTimeout(function() { controller.abort(); }, serverTimeoutMs);
+      resp = await fetch('/ops/playground/infer', {
+        method: 'POST',
+        body: fd,
+        signal: controller.signal
+      });
+      var bodyText = await resp.text();
+      try {
+        data = bodyText ? JSON.parse(bodyText) : {};
+      } catch (_parseErr) {
+        data = { error: bodyText || ('HTTP ' + resp.status) };
+      }
+      if (data && data.ok === true && data.data) {
+        data = data.data;
+      }
+    } catch(err) {
+      clearInterval(waitTicker);
+      if (timerId) clearTimeout(timerId);
+      setNodeState('ocr', 'error');
+      if (err && err.name === 'AbortError') {
+        showError('OCR 응답 시간 초과(' + serverTimeoutMs + 'ms). 엔진 백엔드 상태/모델 로딩 여부를 확인하세요.');
+      } else {
+        showError('네트워크 오류: ' + err.message);
+      }
+      finishRun();
+      return;
+    } finally {
+      clearInterval(waitTicker);
+      if (timerId) clearTimeout(timerId);
+    }
+
+    if (!resp.ok) {
+      setNodeState('ocr', 'error');
+      if (resp.status === 504) {
+        showError('서버 OCR 타임아웃(504): 엔진에서 제한 시간 내 처리가 끝나지 않았습니다.');
+      } else {
+        showError(extractErrorMessage(data, 'OCR 처리 실패 (HTTP ' + resp.status + ')'));
+      }
+      finishRun();
+      return;
+    }
+
+    var t4 = Date.now() - wallStart;
+    stepTimes['ocr'] = t4 - t3;
+    document.getElementById('t-ocr').textContent = stepTimes['ocr'] + 'ms';
+    showStepDetail('ocr', [
+      ['engine_used', data.engine_used || '—'],
+      ['model_used', data.model_used || modelMap[data.engine_used] || planned.model],
+      ['verify_branch', data.vlm_ocr_verify ? 'enabled' : 'disabled'],
+      ['verify_ms', (data.step_timings && data.step_timings.ocr_verify_ms != null) ? (data.step_timings.ocr_verify_ms + 'ms') : '0ms'],
+      ['backend_latency', (data.latency_ms || '—') + 'ms'],
+      ['blocks_found', (data.blocks ? data.blocks.length : 0) + ' blocks']
+    ]);
+    setNodeState('ocr', 'done');
+    completeStepDetail('ocr');
+    markConnector(4);
+
+    /* ── Step 5: Transform ── */
+    setNodeState('transform', 'running');
+    showStepDetail('transform', [
+      ['doc_type', (data.domain && data.domain.doc_type) || 'unknown'],
+      ['entities', data.domain ? JSON.stringify(Object.keys(data.domain.entities || {})) : '[]'],
+      ['corrected_chars', data.corrected_text ? data.corrected_text.length : 0]
+    ]);
+    await sleep(180);
+    var t5 = Date.now() - wallStart;
+    stepTimes['transform'] = t5 - t4;
+    document.getElementById('t-transform').textContent = stepTimes['transform'] + 'ms';
+    setNodeState('transform', 'done');
+    completeStepDetail('transform');
+    markConnector(5);
+
+    /* ── Step 6: Done ── */
+    setNodeState('done', 'running');
+    await sleep(80);
+    var totalWall = Date.now() - wallStart;
+    stepTimes['done'] = totalWall - t5;
+    document.getElementById('t-done').textContent = stepTimes['done'] + 'ms';
+    setNodeState('done', 'done');
+    document.getElementById('totalMs').innerHTML = 'Total wall: <span>' + totalWall + 'ms</span>';
+    stepDetail.classList.add('hidden');
+
+    /* ── Show Results ── */
+    inferResult = data;
+    renderResults(data);
+    finishRun();
+  }
+
+  function finishRun() {
+    isRunning = false;
+    runBtn.disabled = false;
+    runBtn.classList.remove('running');
+    runBtn.querySelector('span').textContent = '▶ Inference 실행';
+  }
+
+  /* ── Results ── */
+  function renderBlocksTable() {
+    var tbody = document.getElementById('rs-blocks-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    function metaVal(v) {
+      if (v === null || v === undefined || v === '') return '—';
+      return String(v);
+    }
+    function spanVal(b) {
+      var rs = b.rowspan || 1;
+      var cs = b.colspan || 1;
+      if (rs === 1 && cs === 1) return '1x1';
+      return rs + 'x' + cs;
+    }
+
+    var selectedType = blocksTypeFilter ? blocksTypeFilter.value : 'all';
+    var filtered = (allBlocks || []).filter(function(b) {
+      if (selectedType === 'all') return true;
+      return String(b.block_type || '').toLowerCase() === selectedType;
+    });
+
+    if (blocksFilterCount) {
+      blocksFilterCount.textContent = filtered.length + ' / ' + (allBlocks || []).length + ' blocks';
+    }
+
+    if (!filtered.length) {
+      var emptyTr = document.createElement('tr');
+      emptyTr.innerHTML = '<td colspan="11" style="color:var(--muted);text-align:center;padding:14px">No blocks for selected type.</td>';
+      tbody.appendChild(emptyTr);
+      return;
+    }
+
+    filtered.forEach(function(b) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td style="font-family:monospace;font-size:11px">' + esc(b.block_id) + '</td>' +
+                     '<td>' + b.page_no + '</td>' +
+                     '<td><span class="badge ok">' + esc(b.block_type) + '</span></td>' +
+                     '<td class="block-meta-cell">' + esc(metaVal(b.table_id)) + '</td>' +
+                     '<td class="block-meta-cell">' + esc(metaVal(b.row_idx)) + '</td>' +
+                     '<td class="block-meta-cell">' + esc(metaVal(b.col_idx)) + '</td>' +
+                     '<td class="block-meta-cell">' + esc(spanVal(b)) + '</td>' +
+                     '<td class="block-meta-cell">' + esc(metaVal(b.reading_order)) + '</td>' +
+                     '<td class="block-meta-cell">' + esc(metaVal(b.parent_block_id)) + '</td>' +
+                     '<td>' + (b.confidence * 100).toFixed(1) + '%' + '</td>' +
+                     '<td class="block-text-cell" title="' + esc(b.text_raw) + '">' + esc(b.text_raw) + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderResults(d) {
+    /* Overview stats */
+    var modelUsed = d.model_used || modelMap[d.engine_used] || '';
+    document.getElementById('rs-engine').textContent     = d.engine_used ? (d.engine_used + (modelUsed ? ' (' + modelUsed + ')' : '')) : '—';
+    document.getElementById('rs-confidence').textContent = d.confidence != null ? (d.confidence * 100).toFixed(1) + '%' : '—';
+    document.getElementById('rs-blocks').textContent     = d.blocks ? d.blocks.length : 0;
+    document.getElementById('rs-latency').textContent    = d.latency_ms ? d.latency_ms + 'ms' : '—';
+    document.getElementById('rs-docid').textContent      = d.doc_id || '—';
+    document.getElementById('rs-filename').textContent   = d.filename || '—';
+    document.getElementById('rs-ctype').textContent      = d.content_type || '—';
+    document.getElementById('rs-doctype').textContent    = (d.domain && d.domain.doc_type) || '—';
+    document.getElementById('rs-title').textContent      = (d.domain && d.domain.title) || '—';
+    document.getElementById('rs-verify').textContent     = d.vlm_ocr_verify ? 'enabled' : 'disabled';
+
+    /* Text */
+    document.getElementById('rs-rawtext').textContent    = d.raw_text || '(empty)';
+    document.getElementById('rs-corrected').textContent  = d.corrected_text || '(empty)';
+
+    /* Blocks */
+    allBlocks = (d.blocks || []).slice();
+    if (blocksTypeFilter) blocksTypeFilter.value = 'all';
+    renderBlocksTable();
+
+    /* Domain */
+    var domainEl = document.getElementById('rs-domain-content');
+    if (d.domain) {
+      var ents = d.domain.entities || {};
+      var groups = Object.entries(ents);
+      var html = '';
+      if (d.domain.summary) {
+        html += '<div class="result-text-box" style="margin-bottom:14px;font-size:13px;font-family:inherit">' + esc(d.domain.summary) + '</div>';
+      }
+      html += '<div class="entity-groups">';
+      groups.forEach(function(pair) {
+        var key = pair[0], vals = pair[1];
+        if (!vals || vals.length === 0) return;
+        html += '<div class="entity-group">';
+        html += '<div class="entity-group-title">' + esc(key) + '</div>';
+        vals.forEach(function(v) {
+          html += '<span class="entity-tag">' + esc(v) + '</span>';
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+      domainEl.innerHTML = html;
+    } else {
+      domainEl.innerHTML = '<p class="empty">No domain data.</p>';
+    }
+
+    /* JSON */
+    document.getElementById('rs-json').innerHTML = syntaxHighlight(JSON.stringify(d, null, 2));
+
+    resultSection.classList.remove('hidden');
+    /* scroll to results */
+    setTimeout(function() {
+      resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+  }
+
+  function hideResults() {
+    resultSection.classList.add('hidden');
+  }
+
+  function showError(msg) {
+    pgError.textContent = '⚠ ' + msg;
+    pgError.classList.add('show');
+  }
+
+  function hideError() {
+    pgError.classList.remove('show');
+  }
+
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  /* ── Tabs ── */
+  document.querySelectorAll('.rtab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.rtab').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.rtab-panel').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      var panel = document.getElementById('rtab-' + btn.getAttribute('data-tab'));
+      if (panel) panel.classList.add('active');
+    });
+  });
+
+  /* ── JSON Syntax Highlight ── */
+  function syntaxHighlight(json) {
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+      var cls = 'json-num';
+      if (/^"/.test(match)) {
+        cls = /:$/.test(match) ? 'json-key' : 'json-str';
+      } else if (/true|false/.test(match)) {
+        cls = 'json-bool';
+      } else if (/null/.test(match)) {
+        cls = 'json-null';
+      }
+      return '<span class="' + cls + '">' + match + '</span>';
+    });
+  }
+
+})();
+</script>
+
+{% endblock %}
