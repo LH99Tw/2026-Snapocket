@@ -13,7 +13,8 @@ import { KnowledgeGraphCanvas } from "./knowledgeGraphCanvas";
 import { GraphControls } from "./graphControls";
 import { AiInputBar } from "./aiInputBar";
 
-// 화면에서 두 프로토타입을 바로 확인할 수 있도록 목 토스트 초기값 설정
+// TODO: [Mock] 백엔드 연결 후 INITIAL_TOASTS 제거. 초기값은 빈 배열([])로 변경.
+//   업로드 완료 toast는 handleUpload에서 실제 API 응답 후 추가되어야 함.
 const INITIAL_TOASTS: ToastItem[] = [
   {
     id: "mock-1",
@@ -55,7 +56,7 @@ export function KnowledgeGraphPage() {
     return () => controller.abort();
   }, []);
 
-  // mock-2 초기 processing → complete 자동 전환 (3.5초)
+  // TODO: [Mock] INITIAL_TOASTS 제거 시 이 useEffect도 함께 삭제
   useEffect(() => {
     const timer = setTimeout(() => {
       setToastItems((prev) =>
@@ -67,18 +68,23 @@ export function KnowledgeGraphPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // TODO: [API] 실제 업로드 흐름으로 교체:
+  //   1. uploadDocument(file) 호출 → document_id 획득
+  //   2. toast를 "processing" 상태로 추가 (analysisId = document_id)
+  //   3. fetchAnalysisStatus(document_id) 폴링으로 "analyzed" 확인 후 status → "complete"
+  //   현재는 타이머로 3.5초 후 complete 처리하는 목업 동작.
   const handleUpload = useCallback((file: File) => {
     const id = `upload-${nextIdRef.current++}`;
     const newItem: ToastItem = {
       id,
       fileName: file.name,
       status: "processing",
-      analysisId: "mock-1", // 업로드된 파일은 mock-1 결과로 연결 (프로토타입)
+      analysisId: "mock-1", // TODO: [Mock] uploadDocument 반환 document_id로 교체
     };
 
     setToastItems((prev) => [newItem, ...prev]);
 
-    // 3.5초 뒤 complete로 전환
+    // TODO: [Mock] 아래 타이머 제거 후 fetchAnalysisStatus 폴링으로 대체
     const timer = setTimeout(() => {
       setToastItems((prev) =>
         prev.map((item) => (item.id === id ? { ...item, status: "complete" } : item))

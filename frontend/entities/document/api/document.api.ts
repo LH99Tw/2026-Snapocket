@@ -65,3 +65,8 @@ export async function updateDocument(
 export async function deleteDocument(id: string): Promise<void> {
   await apiClient<unknown>(`/documents/${id}`, { method: 'DELETE', requireAuth: true })
 }
+
+/** GET /documents/{id}/file — 이미지 미리보기 / 오디오 플레이어용 Blob Object URL 반환 */
+export async function getDocumentFile(id: string): Promise<string> {
+  return apiFetchBlobUrl(`/documents/${id}/file`)
+}

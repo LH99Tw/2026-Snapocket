@@ -229,6 +229,7 @@ export function SidebarNav({ onUpload }: SidebarNavProps) {
             </svg>
           </div>
 
+          {/* TODO: [API] getMe() 호출 후 name, email(또는 role) 표시. 현재는 하드코딩 값 사용 */}
           <div
             className="ml-3 flex flex-col transition-all duration-300 overflow-hidden"
             style={{

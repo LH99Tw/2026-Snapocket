@@ -32,6 +32,9 @@ export function TopHeader({ activeFilter, onFilterChange }: TopHeaderProps) {
         </span>
       </div>
 
+      {/* TODO: [API] getGraphSummary() 결과(node_count, tag_count)를 헤더 우측에 표시 */}
+      {/* TODO: [API] 카테고리 필터 변경 시 부모(KnowledgeGraphPage)의 getNodes(category) 재호출이 이루어지도록
+            현재 onFilterChange prop이 상위에서 처리 중이므로 상위 useEffect에 activeFilter 의존성 추가 필요 */}
       {/* 카테고리 칩 */}
       <nav className="flex items-center gap-2" aria-label="Category filters">
         {CATEGORY_FILTERS.map(({ id, label }) => {

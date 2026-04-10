@@ -15,6 +15,7 @@ export {
   fetchDocument,
   updateDocument,
   deleteDocument,
+  getDocumentFile,
   apiFetchBlobUrl,
 } from './api/document.api'
 export { MOCK_DOCUMENTS } from './mock'
