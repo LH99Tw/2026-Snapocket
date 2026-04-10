@@ -25,3 +25,9 @@ export interface ConfirmPayload {
   summary: string
   tags: string[]
 }
+
+/** POST /analysis/{id}/start → data */
+export interface StartAnalysisResponse {
+  job_id: string
+  status: 'processing'
+}
