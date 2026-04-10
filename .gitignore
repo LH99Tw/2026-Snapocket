@@ -40,3 +40,7 @@ backend/.env
 Thumbs.db
 /ai/data
 /ai/markdown
+
+# ── Aigent ─────────────────────────────────────────────────────────────────────────
+.mcp.json
+CLAUDE.md
